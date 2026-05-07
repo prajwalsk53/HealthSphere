@@ -13,7 +13,7 @@ $q   = trim($_GET['q'] ?? '');
 $key = defined('SPOONACULAR_API_KEY') ? SPOONACULAR_API_KEY : '';
 
 if (!$key) {
-    echo json_encode([]);
+    echo json_encode(['_no_key' => true]);
     exit;
 }
 

@@ -730,11 +730,14 @@ async function onFoodSearch(q) {
       const localFoods = localRes.status === 'fulfilled'
         ? await localRes.value.json().catch(() => [])
         : [];
-      const spoonFoods = spoonRes.status === 'fulfilled'
+      const spoonRaw   = spoonRes.status === 'fulfilled'
         ? await spoonRes.value.json().catch(() => [])
         : [];
+      // _no_key is a sentinel object, not an array
+      const spoonFoods = Array.isArray(spoonRaw) ? spoonRaw : [];
+      const spoonNoKey = !Array.isArray(spoonRaw) && spoonRaw._no_key;
 
-      renderDropdown(localFoods, spoonFoods, q);
+      renderDropdown(localFoods, spoonFoods, q, spoonNoKey);
     } catch(e) {
       drop.innerHTML = '<div class="fd-empty">Could not load foods.</div>';
     }
@@ -783,7 +786,7 @@ function foodItemHTML(f, q) {
   </div>`;
 }
 
-function renderDropdown(localFoods, spoonFoods, q) {
+function renderDropdown(localFoods, spoonFoods, q, spoonNoKey) {
   const drop = document.getElementById('foodDropdown');
   let html = '';
 
@@ -797,6 +800,9 @@ function renderDropdown(localFoods, spoonFoods, q) {
     html += `<div style="padding:6px 14px 4px;font-size:10px;font-weight:800;color:var(--hs-muted);text-transform:uppercase;letter-spacing:.6px;background:#F0F9FF;border-bottom:1px solid #E0F2FE;border-top:2px solid #E0F2FE;">
       <i class="fas fa-globe" style="color:#0284C7;"></i> Spoonacular — 80,000+ Foods</div>`;
     html += spoonFoods.map(f => foodItemHTML(f, q)).join('');
+  } else if (q.length >= 2 && !spoonNoKey) {
+    html += `<div style="padding:8px 14px;font-size:11.5px;color:var(--hs-muted);background:#F0F9FF;border-top:1px solid #E0F2FE;display:flex;align-items:center;gap:8px;">
+      <i class="fas fa-circle-notch fa-spin" style="color:#0284C7;"></i> Searching Spoonacular…</div>`;
   }
 
   if (!html) {
