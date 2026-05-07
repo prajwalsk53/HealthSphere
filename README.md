@@ -203,7 +203,11 @@ Then paste any food product's ingredient list — the scanner instantly checks 1
 
 > Add screenshots of your app here. Suggested pages to capture:
 > - Patient Dashboard
+<img width="1887" height="912" alt="image" src="https://github.com/user-attachments/assets/0072aa5a-9f6f-4464-8e55-c639faf534ed" />
+
 > - Safe Appetite Scanner with results
+<img width="1890" height="920" alt="image" src="https://github.com/user-attachments/assets/81ae562d-0d3b-48d4-a149-f8fad92e5a18" />
+
 > - Diet Tracker
 > - Health Analysis charts
 > - Admin Dashboard
