@@ -709,88 +709,196 @@ function setMealType(type, btn) {
   else document.querySelector(`.mtt-btn[data-type="${type}"]`)?.classList.add('active');
 }
 
-// ── Food search live dropdown ─────────────────────────────────────────
+// ── Food search — calls local DB + Spoonacular in parallel ───────────
 let searchTimer = null;
+
 async function onFoodSearch(q) {
   clearTimeout(searchTimer);
+  const delay = q.length >= 2 ? 280 : 0;
   searchTimer = setTimeout(async () => {
     const drop = document.getElementById('foodDropdown');
-    drop.innerHTML = '<div class="fd-empty"><i class="fas fa-circle-notch fa-spin"></i></div>';
+    drop.innerHTML = '<div class="fd-empty"><i class="fas fa-circle-notch fa-spin"></i> Searching…</div>';
     drop.style.display = 'block';
+
     try {
-      const res   = await fetch(`/HealthSphere/api/food-search.php?q=${encodeURIComponent(q)}`);
-      const foods = await res.json();
-      renderDropdown(foods, q);
+      // Fire both requests simultaneously
+      const [localRes, spoonRes] = await Promise.allSettled([
+        fetch(`/HealthSphere/api/food-search.php?q=${encodeURIComponent(q)}`),
+        fetch(`/HealthSphere/api/spoonacular-search.php?q=${encodeURIComponent(q)}`),
+      ]);
+
+      const localFoods = localRes.status === 'fulfilled'
+        ? await localRes.value.json().catch(() => [])
+        : [];
+      const spoonFoods = spoonRes.status === 'fulfilled'
+        ? await spoonRes.value.json().catch(() => [])
+        : [];
+
+      renderDropdown(localFoods, spoonFoods, q);
     } catch(e) {
       drop.innerHTML = '<div class="fd-empty">Could not load foods.</div>';
     }
-  }, q.length ? 200 : 0);
+  }, delay);
 }
 
-function renderDropdown(foods, q) {
+const CAT_COLOR = {
+  Protein:'#FEE2E2', Fish:'#DBEAFE', Grain:'#FEF3C7', Vegetable:'#DCFCE7',
+  Fruit:'#FCE7F3', Dairy:'#F0F9FF', Processed:'#F3F4F6', 'Nuts & Seeds':'#FEF9C3',
+  Drinks:'#E0F2FE', 'Fats & Oils':'#FFF7ED', Spices:'#F5F3FF',
+  Condiments:'#FDF4FF', Sweets:'#FFF0F0', Other:'#F3F4F6',
+};
+
+function hl(str, q) {
+  if (!q) return str;
+  return str.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'),
+    '<mark style="background:#FEF08A;border-radius:2px;padding:0 1px;">$1</mark>');
+}
+
+function foodItemHTML(f, q) {
+  const emoji  = CATEGORY_EMOJI[f.category] || CATEGORY_EMOJI.default;
+  const bg     = CAT_COLOR[f.category] || '#F3F4F6';
+  const isSpoon = f.source === 'spoonacular';
+
+  const thumb = isSpoon && f.image
+    ? `<img src="${f.image}" style="width:36px;height:36px;border-radius:10px;object-fit:cover;" onerror="this.style.display='none'">`
+    : `<div class="fd-icon" style="background:${bg};">${emoji}</div>`;
+
+  const calStr = f.calories_per_100g != null
+    ? `${Math.round(f.calories_per_100g)}<br><span style="font-size:9px;font-weight:500;">kcal/100g</span>`
+    : `<i class="fas fa-circle-notch" style="font-size:11px;color:#9CA3AF;"></i><br><span style="font-size:9px;color:#9CA3AF;">tap to load</span>`;
+
+  const sourceBadge = isSpoon
+    ? `<span style="font-size:9px;font-weight:700;background:#E0F2FE;color:#0369A1;padding:1px 5px;border-radius:4px;margin-left:4px;">🌐 Spoonacular</span>`
+    : '';
+
+  const safeF = JSON.stringify(f).replace(/'/g, '&#39;');
+  return `<div class="fd-item" onclick='handleFoodSelect(${safeF})'>
+    ${thumb}
+    <div class="fd-info">
+      <div class="fd-name">${hl(f.food_name, q)}${sourceBadge}</div>
+      <div class="fd-meta">${f.category} · ${f.portion_size || '100g serving'}</div>
+    </div>
+    <span class="fd-rating ${f.health_rating || 'good'}">${f.health_rating || 'good'}</span>
+    <div class="fd-cal">${calStr}</div>
+  </div>`;
+}
+
+function renderDropdown(localFoods, spoonFoods, q) {
   const drop = document.getElementById('foodDropdown');
-  if (!foods.length) {
-    drop.innerHTML = `<div class="fd-empty">No foods found for "<b>${q}</b>".<br><small>Use "Enter manually" below.</small></div>`;
-    drop.style.display = 'block';
-    return;
+  let html = '';
+
+  if (localFoods.length) {
+    html += `<div style="padding:6px 14px 4px;font-size:10px;font-weight:800;color:var(--hs-muted);text-transform:uppercase;letter-spacing:.6px;background:#F9FAFB;border-bottom:1px solid #F3F4F6;">
+      <i class="fas fa-database" style="color:var(--hs-blue);"></i> Health Database</div>`;
+    html += localFoods.map(f => foodItemHTML(f, q)).join('');
   }
-  const hl = (str) => {
-    if (!q) return str;
-    return str.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'), '<mark style="background:#FEF08A;border-radius:2px;">$1</mark>');
-  };
-  drop.innerHTML = foods.map(f => {
-    const emoji = CATEGORY_EMOJI[f.category] || CATEGORY_EMOJI.default;
-    const catColors = {Protein:'#FEE2E2',Fish:'#DBEAFE',Grain:'#FEF3C7',Vegetable:'#DCFCE7',Fruit:'#FCE7F3',Dairy:'#F0F9FF',Processed:'#F3F4F6'};
-    const bg = catColors[f.category] || '#F3F4F6';
-    return `<div class="fd-item" onclick='selectFood(${JSON.stringify(f)})'>
-      <div class="fd-icon" style="background:${bg};">${emoji}</div>
-      <div class="fd-info">
-        <div class="fd-name">${hl(f.food_name)}</div>
-        <div class="fd-meta">${f.category} · ${f.portion_size || '100g serving'}</div>
-      </div>
-      <span class="fd-rating ${f.health_rating}">${f.health_rating}</span>
-      <div class="fd-cal">${Math.round(f.calories_per_100g)}<br><span style="font-size:9px;font-weight:500;">kcal/100g</span></div>
-    </div>`;
-  }).join('');
+
+  if (spoonFoods.length) {
+    html += `<div style="padding:6px 14px 4px;font-size:10px;font-weight:800;color:var(--hs-muted);text-transform:uppercase;letter-spacing:.6px;background:#F0F9FF;border-bottom:1px solid #E0F2FE;border-top:2px solid #E0F2FE;">
+      <i class="fas fa-globe" style="color:#0284C7;"></i> Spoonacular — 80,000+ Foods</div>`;
+    html += spoonFoods.map(f => foodItemHTML(f, q)).join('');
+  }
+
+  if (!html) {
+    html = `<div class="fd-empty">No foods found for "<b>${q || 'your search'}</b>".<br>
+      <small>Try a different term or use "Enter manually" below.</small></div>`;
+  }
+
+  drop.innerHTML = html;
   drop.style.display = 'block';
 }
 
-function selectFood(food) {
-  selectedFood = food;
-  document.getElementById('foodSearchInput').value = food.food_name;
+// ── Handle food selection (local = instant, Spoonacular = fetch macros) ──
+async function handleFoodSelect(food) {
   document.getElementById('foodDropdown').style.display = 'none';
+  document.getElementById('foodSearchInput').value = food.food_name;
+  if (manualMode) toggleManual();
 
-  const emoji = CATEGORY_EMOJI[food.category] || CATEGORY_EMOJI.default;
-  document.getElementById('sfcEmoji').textContent    = emoji;
+  if (food.source === 'spoonacular' && food.calories_per_100g == null) {
+    // Show card in loading state first
+    showFoodCard(food, true);
+    try {
+      const res  = await fetch(`/HealthSphere/api/spoonacular-info.php?id=${food.spoonacular_id}`);
+      const info = await res.json();
+      if (info.ok) {
+        // Merge full macro data into the food object
+        food.calories_per_100g = info.calories_per_100g;
+        food.protein_g         = info.protein_g;
+        food.sugar_g           = info.carbs_g;   // map carbs → sugar field
+        food.fats_g            = info.fats_g;
+        food.fiber_g           = info.fiber_g;
+        food.health_rating     = healthRating(info.calories_per_100g, info.fats_g, info.fiber_g);
+        selectedFood = food;
+        showFoodCard(food, false);
+      } else {
+        document.getElementById('sfcName').textContent += ' — nutrition unavailable';
+      }
+    } catch(e) {
+      document.getElementById('sfcName').textContent += ' (could not load nutrition)';
+    }
+  } else {
+    selectFood(food);
+  }
+}
+
+// Estimate health rating from macros
+function healthRating(cal, fat, fiber) {
+  if (cal < 100 && fiber > 2)    return 'excellent';
+  if (cal < 200 && fat < 10)     return 'good';
+  if (cal < 400)                  return 'moderate';
+  return 'poor';
+}
+
+function showFoodCard(food, loading) {
+  const emoji = food.image && food.source === 'spoonacular'
+    ? `<img src="${food.image}" style="width:40px;height:40px;border-radius:10px;object-fit:cover;" onerror="this.outerHTML='🍽️'">`
+    : (CATEGORY_EMOJI[food.category] || '🍽️');
+
+  document.getElementById('sfcEmoji').innerHTML   = typeof emoji === 'string' && emoji.length < 5 ? emoji : '';
+  if (food.image && food.source === 'spoonacular') {
+    document.getElementById('sfcEmoji').innerHTML = `<img src="${food.image}" style="width:40px;height:40px;border-radius:10px;object-fit:cover;" onerror="this.outerHTML='🍽️'">`;
+  } else {
+    document.getElementById('sfcEmoji').textContent = CATEGORY_EMOJI[food.category] || '🍽️';
+  }
+
   document.getElementById('sfcName').textContent     = food.food_name;
   document.getElementById('sfcCategory').textContent = food.category;
 
   const ratingEl = document.getElementById('sfcRating');
-  ratingEl.textContent  = food.health_rating;
-  ratingEl.className    = `fd-rating ${food.health_rating}`;
+  ratingEl.textContent = food.health_rating || 'good';
+  ratingEl.className   = `fd-rating ${food.health_rating || 'good'}`;
 
-  // Parse suggested portion from e.g. "150g / 1 fillet"
   const portionMatch = (food.portion_size || '').match(/(\d+)g/);
   const suggestedG   = portionMatch ? parseInt(portionMatch[1]) : 100;
   document.getElementById('portionInput').value = suggestedG;
   document.getElementById('portionHint').textContent = food.portion_size ? `Suggested: ${food.portion_size}` : '';
 
   document.getElementById('selectedFoodCard').style.display = 'block';
-  recalcMacros();
 
-  // If in manual mode, exit it
-  if (manualMode) toggleManual();
+  if (loading) {
+    ['mp-cal','mp-prot','mp-carbs','mp-fats','mp-fiber'].forEach(id => {
+      document.getElementById(id).innerHTML = '<i class="fas fa-circle-notch fa-spin" style="font-size:11px;color:#9CA3AF;"></i>';
+    });
+  } else {
+    recalcMacros();
+  }
+}
+
+function selectFood(food) {
+  selectedFood = food;
+  showFoodCard(food, false);
 }
 
 function recalcMacros() {
-  if (!selectedFood) return;
+  if (!selectedFood || selectedFood.calories_per_100g == null) return;
   const portion = parseFloat(document.getElementById('portionInput').value) || 100;
   const factor  = portion / 100;
-  const cal   = Math.round(selectedFood.calories_per_100g * factor);
-  const prot  = (selectedFood.protein_g  * factor).toFixed(1);
-  const carbs = (selectedFood.sugar_g    * factor).toFixed(1);
-  const fats  = (selectedFood.fats_g     * factor).toFixed(1);
-  const fiber = (selectedFood.fiber_g    * factor).toFixed(1);
+
+  const cal   = Math.round((selectedFood.calories_per_100g || 0) * factor);
+  const prot  = ((selectedFood.protein_g || 0) * factor).toFixed(1);
+  const carbs = ((selectedFood.sugar_g   || 0) * factor).toFixed(1);
+  const fats  = ((selectedFood.fats_g    || 0) * factor).toFixed(1);
+  const fiber = ((selectedFood.fiber_g   || 0) * factor).toFixed(1);
 
   document.getElementById('mp-cal').textContent   = cal;
   document.getElementById('mp-prot').textContent  = prot + 'g';
@@ -798,7 +906,6 @@ function recalcMacros() {
   document.getElementById('mp-fats').textContent  = fats + 'g';
   document.getElementById('mp-fiber').textContent = fiber + 'g';
 
-  // Colour the calorie pill by value
   const calPill = document.getElementById('mp-cal').closest('.macro-pill');
   calPill.style.borderColor = cal > 600 ? '#FCA5A5' : cal > 300 ? '#FCD34D' : '#86EFAC';
 }
