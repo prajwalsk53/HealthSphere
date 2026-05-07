@@ -209,11 +209,18 @@ Then paste any food product's ingredient list — the scanner instantly checks 1
 <img width="1890" height="920" alt="image" src="https://github.com/user-attachments/assets/81ae562d-0d3b-48d4-a149-f8fad92e5a18" />
 
 > - Diet Tracker
+<img width="1870" height="910" alt="image" src="https://github.com/user-attachments/assets/4b8fbf7a-cf7c-45c9-8f1b-3d83905c3b68" />
+
 > - Health Analysis charts
+<img width="1890" height="912" alt="image" src="https://github.com/user-attachments/assets/db7fb878-0f8a-4047-8912-45f403e689c3" />
+
 > - Admin Dashboard
+<img width="1875" height="907" alt="image" src="https://github.com/user-attachments/assets/c375b495-169a-449c-8f03-19df18bcc64d" />
+
 > - Doctor Patient view
 
----
+<img width="1882" height="887" alt="image" src="https://github.com/user-attachments/assets/96b5bec8-5955-4e56-b917-b3e2918594c9" />
+
 
 ## Database Schema
 
