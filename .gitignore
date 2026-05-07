@@ -1,0 +1,35 @@
+# ── Sensitive configuration (never commit real credentials) ──────────
+config/db.php
+config/ai.php
+config/mail.php
+
+# ── XAMPP / local server artifacts ───────────────────────────────────
+*.log
+*.bak
+*.tmp
+Thumbs.db
+.DS_Store
+
+# ── Claude Code internal settings ────────────────────────────────────
+.claude/
+
+# ── PHP dependency / cache ────────────────────────────────────────────
+vendor/
+composer.lock
+
+# ── Flutter build artifacts ───────────────────────────────────────────
+flutter_app/build/
+flutter_app/.dart_tool/
+flutter_app/.flutter-plugins
+flutter_app/.flutter-plugins-dependencies
+flutter_app/pubspec.lock
+*.g.dart
+
+# ── Flutter web build output (large binary files) ────────────────────
+app/
+
+# ── IDE / editor files ────────────────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.user

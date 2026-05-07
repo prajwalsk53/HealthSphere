@@ -1,0 +1,19 @@
+# CORS — must fire before PHP runs
+<IfModule mod_headers.c>
+    Header always set Access-Control-Allow-Origin  "*"
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Authorization, Content-Type, X-Requested-With, Accept"
+    Header always set Access-Control-Max-Age       "86400"
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Pass Authorization header through to PHP (Apache strips it by default)
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Return 204 immediately for OPTIONS preflight — never reaches PHP
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule .* - [R=204,L]
+</IfModule>

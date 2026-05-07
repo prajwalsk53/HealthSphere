@@ -1,0 +1,488 @@
+    <!-- Family History — Full Interactive Tree -->
+    <?php if ($activeTab === 'family'): ?>
+    <?php
+    function fRiskColor(array $conds): string {
+        $t = strtolower(implode(' ', array_column($conds,'condition_name')));
+        foreach (['heart','cancer','stroke','hypertension','cholesterol','diabetes','brca','coronary','atrial','angina'] as $k)
+            if (str_contains($t,$k)) return '#DC2626';
+        foreach (['thyroid','calcium','arthritis','anxiety','obesity','asthma','eczema','osteoporosis','fatty liver','degeneration'] as $k)
+            if (str_contains($t,$k)) return '#D97706';
+        return '#16A34A';
+    }
+    function fCondPills(array $conds, int $max=2): string {
+        if (!$conds) return '<span class="cpill cpill-grey">No data</span>';
+        $html=''; $map=['heart'=>'red','cancer'=>'red','stroke'=>'red','hypertension'=>'red','cholesterol'=>'red','brca'=>'red','diabetes'=>'red','coronary'=>'red','atrial'=>'red','thyroid'=>'orange','anxiety'=>'orange','obesity'=>'orange','asthma'=>'orange','arthritis'=>'orange','calcium'=>'orange','eczema'=>'orange','fatty'=>'orange'];
+        foreach(array_slice($conds,0,$max) as $c){
+            $cls='green'; $t=strtolower($c['condition_name']);
+            foreach($map as $k=>$v){if(str_contains($t,$k)){$cls=$v;break;}}
+            $sh=mb_strlen($c['condition_name'])>21?mb_substr($c['condition_name'],0,19).'…':$c['condition_name'];
+            $html.="<span class='cpill cpill-{$cls}'>".htmlspecialchars($sh).'</span>';
+        }
+        $ex=count($conds)-$max; if($ex>0) $html.="<span class='cpill cpill-grey'>+{$ex} more</span>";
+        return $html;
+    }
+    function fGrpByPerson(array $recs): array {
+        $out=[];
+        foreach($recs as $r) $out[$r['relation_name']][]=$r;
+        return $out;
+    }
+    function fCard(string $av, string $name, string $rel, array $conds, bool $ph=false, bool $you=false, bool $dec=false, ?int $decYr=null): string {
+        $cls='fcard'.($ph?' fcard-ph':'').($you?' fcard-you':'');
+        $rc=!$ph&&!$you?fRiskColor($conds):'transparent';
+        $dataAttr='';
+        if(!$ph&&!$you){
+            $obj=['name'=>$name,'rel'=>$rel,'av'=>$av,'conds'=>$conds,'dec'=>$dec,'dec_yr'=>$decYr];
+            $dataAttr='onclick="showP(event,'.htmlspecialchars(json_encode($obj),ENT_QUOTES).')"';
+        }
+        $decBadge=$dec?"<span class='fcard-dec'>Deceased".($decYr?" {$decYr}":'').'</span>':'';
+        $pills=$you?"<span style='font-size:11px;color:rgba(255,255,255,.7);font-weight:600;'>You</span>":fCondPills($conds);
+        return "<div class='{$cls}' {$dataAttr}>{$decBadge}<span class='fcard-av'>{$av}</span><div class='fcard-name'>".htmlspecialchars($name)."</div><div class='fcard-rel'>".htmlspecialchars($rel)."</div><div class='fcard-pills'>{$pills}</div><div class='fcard-riskbar' style='background:{$rc};'></div></div>";
+    }
+    function fPH(string $av, string $rel): string { return fCard($av,'Unknown',$rel,[],true); }
+
+    // Build records per type
+    $pgfR  = $famByRel['grandfather_paternal'] ?? [];
+    $pgmR  = $famByRel['grandmother_paternal'] ?? [];
+    $mgfR  = $famByRel['grandfather_maternal'] ?? [];
+    $mgmR  = $famByRel['grandmother_maternal'] ?? [];
+    $fatR  = $famByRel['father']  ?? [];
+    $motR  = $famByRel['mother']  ?? [];
+    $brtR  = $famByRel['brother'] ?? [];
+    $sisR  = $famByRel['sister']  ?? [];
+    $uncPat  = fGrpByPerson($famByRel['uncle_paternal']  ?? []);
+    $auntPat = fGrpByPerson($famByRel['aunt_paternal']   ?? []);
+    $uncMat  = fGrpByPerson($famByRel['uncle_maternal']  ?? []);
+    $auntMat = fGrpByPerson($famByRel['aunt_maternal']   ?? []);
+    $couPat  = fGrpByPerson($famByRel['cousin_paternal'] ?? []);
+    $couMat  = fGrpByPerson($famByRel['cousin_maternal'] ?? []);
+
+    $totalMembers = count(array_unique(array_column($familyHx,'relation_name')));
+    $totalConds   = count($familyHx);
+    ?>
+
+    <!-- ─── STYLES ────────────────────────────────────────────── -->
+    <style>
+    /* ── Card ── */
+    .fcard{width:136px;flex-shrink:0;background:#fff;border:2px solid var(--hs-border);border-radius:14px;padding:11px 9px 14px;text-align:center;cursor:pointer;transition:all .22s;position:relative;z-index:2;box-shadow:0 2px 8px rgba(10,31,68,.07);}
+    .fcard:hover{transform:translateY(-5px);box-shadow:0 10px 28px rgba(10,31,68,.16);}
+    .fcard.fcard-ph{opacity:.4;cursor:default;border-style:dashed;}
+    .fcard.fcard-ph:hover{transform:none;box-shadow:none;}
+    .fcard.fcard-you{background:linear-gradient(140deg,#071330,#1565C0);border-color:#1565C0;cursor:default;box-shadow:0 8px 28px rgba(21,101,192,.35);}
+    .fcard.fcard-you:hover{transform:none;}
+    .fcard-av{font-size:24px;display:block;margin-bottom:5px;}
+    .fcard-name{font-size:11px;font-weight:800;color:var(--hs-navy);line-height:1.3;margin-bottom:2px;}
+    .fcard.fcard-you .fcard-name,.fcard.fcard-you .fcard-rel{color:#fff;}
+    .fcard-rel{font-size:9px;font-weight:700;color:var(--hs-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+    .fcard.fcard-you .fcard-rel{color:rgba(255,255,255,.65);}
+    .fcard-pills{display:flex;flex-direction:column;gap:3px;}
+    .cpill{padding:2px 6px;border-radius:20px;font-size:9px;font-weight:700;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .cpill-red{background:#FEE2E2;color:#991B1B;}
+    .cpill-orange{background:#FEF3C7;color:#92400E;}
+    .cpill-green{background:#DCFCE7;color:#166534;}
+    .cpill-grey{background:#F1F5F9;color:#5E7A99;font-style:italic;}
+    .fcard-riskbar{position:absolute;bottom:0;left:0;right:0;height:3px;border-radius:0 0 12px 12px;}
+    .fcard-dec{position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:#DC2626;color:#fff;font-size:8px;font-weight:700;padding:1px 6px;border-radius:10px;white-space:nowrap;}
+
+    /* ── Tree layout ── */
+    .ftree-v2{display:flex;flex-direction:column;align-items:center;gap:0;width:100%;}
+
+    /* Row containers */
+    .ft-row{display:flex;align-items:flex-start;justify-content:center;gap:0;width:100%;}
+
+    /* Horizontal couple join */
+    .c-h{height:2px;background:#D0E4FF;flex-shrink:0;align-self:center;}
+    /* Vertical drop */
+    .c-v{width:2px;background:#D0E4FF;flex-shrink:0;}
+    /* Center column for vertical lines */
+    .c-center-v{display:flex;flex-direction:column;align-items:center;}
+
+    /* Two-column half wrappers */
+    .ft-half{display:flex;flex-direction:column;align-items:center;flex:1;}
+    .ft-half.mat-side{align-items:flex-end;padding-right:40px;}
+    .ft-half.pat-side{align-items:flex-start;padding-left:40px;}
+
+    /* Section label chips */
+    .sec-label{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;margin-bottom:8px;text-align:center;}
+
+    /* Divider line between sections */
+    .ft-divider{display:flex;align-items:center;gap:10px;width:100%;margin:4px 0;}
+    .ft-divider-line{flex:1;height:1.5px;background:linear-gradient(90deg,transparent,#D0E4FF,transparent);}
+    .ft-divider-label{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--hs-muted);padding:3px 12px;background:#F8FAFF;border-radius:20px;border:1px solid var(--hs-border);white-space:nowrap;}
+
+    /* Full-width ft-page */
+    .ft-page{padding:0 0 40px;}
+    .ft-hdr{display:flex;align-items:center;gap:14px;padding:14px 18px;background:#fff;border-radius:12px;border:1px solid var(--hs-border);margin-bottom:20px;}
+    .ft-scroll{overflow-x:auto;padding-bottom:12px;}
+    .ft-inner{display:flex;flex-direction:column;align-items:center;min-width:840px;padding:10px 30px 30px;}
+
+    /* Legend */
+    .ft-legend{display:flex;gap:12px;flex-wrap:wrap;padding:12px 16px;background:#fff;border-radius:10px;border:1px solid var(--hs-border);margin-top:18px;font-size:11.5px;align-items:center;}
+    .ftleg-i{display:flex;align-items:center;gap:6px;}
+    .ftleg-d{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+
+    /* Uncle/aunt cluster */
+    .sibling-cluster{display:flex;flex-direction:column;align-items:center;gap:8px;}
+    .sibling-cluster-row{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;justify-content:center;}
+    </style>
+
+    <div class="ft-page">
+
+      <!-- Header -->
+      <div class="ft-hdr">
+        <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#0A1F44,#1565C0);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">🧬</div>
+        <div style="flex:1;">
+          <div style="font-size:15px;font-weight:800;color:var(--hs-navy);">Family Medical Tree</div>
+          <div style="font-size:12px;color:var(--hs-muted);"><?= $totalMembers ?> members &middot; <?= $totalConds ?> conditions &middot; Click any card for full details &amp; genetic risk</div>
+        </div>
+        <button class="btn-hs btn-primary-hs btn-sm-hs" onclick="document.getElementById('addMemberModal').style.display='flex'">
+          <i class="fas fa-plus"></i> Add Member
+        </button>
+      </div>
+
+      <div class="ft-scroll">
+       <div class="ft-inner">
+        <div class="ftree-v2">
+
+          <?php
+          // Helper: short first name
+          function fShortName(string $n): string { return explode(' (',$n)[0]; }
+          ?>
+
+          <!-- ════════════════════════════════════
+               ROW 1 — YOU (top centre) + SIBLINGS
+          ════════════════════════════════════ -->
+          <div class="ft-row" style="gap:0;justify-content:center;align-items:flex-start;">
+
+            <!-- Siblings LEFT (brothers) -->
+            <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;padding-top:30px;">
+              <?php foreach (fGrpByPerson($brtR) as $nm=>$cs): ?>
+              <div style="display:flex;align-items:center;">
+                <?= fCard('👦',fShortName($nm),'Brother',$cs) ?>
+                <div class="c-h" style="width:16px;"></div>
+              </div>
+              <?php endforeach; ?>
+            </div>
+
+            <!-- YOU -->
+            <div style="display:flex;flex-direction:column;align-items:center;">
+              <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--hs-blue);margin-bottom:8px;padding:3px 12px;background:#DBEAFE;border-radius:20px;">You</div>
+              <?= fCard('🧑',$userFull['first_name'].' '.$userFull['last_name'],'You',[],false,true) ?>
+            </div>
+
+            <!-- Siblings RIGHT (sisters) -->
+            <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start;padding-top:30px;">
+              <?php foreach (fGrpByPerson($sisR) as $nm=>$cs): ?>
+              <div style="display:flex;align-items:center;">
+                <div class="c-h" style="width:16px;"></div>
+                <?= fCard('👧',fShortName($nm),'Sister',$cs) ?>
+              </div>
+              <?php endforeach; ?>
+            </div>
+
+          </div><!-- /emma row -->
+
+          <!-- Vertical drop to parents -->
+          <div class="c-center-v"><div class="c-v" style="height:36px;"></div></div>
+
+          <!-- ════════════════════════════════════
+               ROW 2 — PARENTS
+          ════════════════════════════════════ -->
+          <div class="ft-row" style="gap:0;justify-content:center;align-items:flex-start;">
+
+            <!-- Mother side label -->
+            <div style="display:flex;flex-direction:column;align-items:center;">
+              <div class="sec-label" style="color:#1565C0;background:#DBEAFE;">Maternal Side</div>
+              <?= $motR ? fCard('👩',$motR[0]['relation_name'],'Mother',$motR,false,false,!empty($motR[0]['year_deceased']),(int)($motR[0]['year_deceased']??0)?:null) : fPH('👩','Mother') ?>
+            </div>
+
+            <!-- Horizontal line between parents -->
+            <div class="c-h" style="width:70px;margin-top:66px;"></div>
+
+            <!-- Father side label -->
+            <div style="display:flex;flex-direction:column;align-items:center;">
+              <div class="sec-label" style="color:#7C3AED;background:#EDE9FE;">Paternal Side</div>
+              <?= $fatR ? fCard('👨',$fatR[0]['relation_name'],'Father',$fatR,false,false,!empty($fatR[0]['year_deceased']),(int)($fatR[0]['year_deceased']??0)?:null) : fPH('👨','Father') ?>
+            </div>
+
+          </div><!-- /parents row -->
+
+          <!-- Two drops to grandparents -->
+          <div style="display:flex;width:100%;justify-content:space-around;padding:0 120px;">
+            <div class="c-v" style="height:36px;"></div>
+            <div class="c-v" style="height:36px;"></div>
+          </div>
+
+          <!-- ════════════════════════════════════
+               ROW 3 — GRANDPARENTS
+          ════════════════════════════════════ -->
+          <div class="ft-row" style="gap:60px;justify-content:center;align-items:flex-start;">
+
+            <!-- MATERNAL GRANDPARENTS -->
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0;">
+              <div class="sec-label" style="color:#1565C0;background:#EFF6FF;">Mother's Parents</div>
+              <div style="display:flex;align-items:center;">
+                <?= $mgfR ? fCard('👴',$mgfR[0]['relation_name'],'Mat. Grandfather',$mgfR,false,false,!empty($mgfR[0]['year_deceased']),(int)($mgfR[0]['year_deceased']??0)?:null) : fPH('👴','Mat. Grandfather') ?>
+                <div class="c-h" style="width:32px;"></div>
+                <?= $mgmR ? fCard('👵',$mgmR[0]['relation_name'],'Mat. Grandmother',$mgmR,false,false,!empty($mgmR[0]['year_deceased']),(int)($mgmR[0]['year_deceased']??0)?:null) : fPH('👵','Mat. Grandmother') ?>
+              </div>
+            </div>
+
+            <!-- PATERNAL GRANDPARENTS -->
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0;">
+              <div class="sec-label" style="color:#7C3AED;background:#F5F3FF;">Father's Parents</div>
+              <div style="display:flex;align-items:center;">
+                <?= $pgfR ? fCard('👴',$pgfR[0]['relation_name'],'Pat. Grandfather',$pgfR,false,false,!empty($pgfR[0]['year_deceased']),(int)($pgfR[0]['year_deceased']??0)?:null) : fPH('👴','Pat. Grandfather') ?>
+                <div class="c-h" style="width:32px;"></div>
+                <?= $pgmR ? fCard('👵',$pgmR[0]['relation_name'],'Pat. Grandmother',$pgmR,false,false,!empty($pgmR[0]['year_deceased']),(int)($pgmR[0]['year_deceased']??0)?:null) : fPH('👵','Pat. Grandmother') ?>
+              </div>
+            </div>
+
+          </div><!-- /grandparents row -->
+
+          <!-- Two drops to aunts/uncles -->
+          <div style="display:flex;width:100%;justify-content:space-around;padding:0 120px;">
+            <div class="c-v" style="height:36px;"></div>
+            <div class="c-v" style="height:36px;"></div>
+          </div>
+
+          <!-- ════════════════════════════════════
+               ROW 4 — AUNTS & UNCLES
+               (siblings of parents = children of grandparents)
+          ════════════════════════════════════ -->
+          <div class="ft-row" style="gap:60px;justify-content:center;align-items:flex-start;">
+
+            <!-- MATERNAL AUNTS & UNCLES -->
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0;">
+              <?php if ($uncMat || $auntMat): ?>
+              <div class="sec-label" style="color:#1565C0;background:#EFF6FF;">Mother's Siblings</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                <?php foreach ($uncMat as $nm=>$cs): ?>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+                  <?= fCard('👨‍💼',fShortName($nm),"Mother's Brother",$cs) ?>
+                </div>
+                <?php endforeach; ?>
+                <?php foreach ($auntMat as $nm=>$cs): ?>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+                  <?= fCard('👩‍💼',fShortName($nm),"Mother's Sister",$cs) ?>
+                </div>
+                <?php endforeach; ?>
+              </div>
+              <?php else: ?>
+              <div style="width:136px;height:166px;border:2px dashed var(--hs-border);border-radius:14px;display:flex;align-items:center;justify-content:center;opacity:.35;">
+                <div style="text-align:center;font-size:11px;color:var(--hs-muted);">No maternal<br>aunts/uncles<br>recorded</div>
+              </div>
+              <?php endif; ?>
+            </div>
+
+            <!-- PATERNAL AUNTS & UNCLES -->
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0;">
+              <?php if ($uncPat || $auntPat): ?>
+              <div class="sec-label" style="color:#7C3AED;background:#F5F3FF;">Father's Siblings</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                <?php foreach ($uncPat as $nm=>$cs): ?>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+                  <?= fCard('👨‍💼',fShortName($nm),"Father's Brother",$cs) ?>
+                </div>
+                <?php endforeach; ?>
+                <?php foreach ($auntPat as $nm=>$cs): ?>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+                  <?= fCard('👩‍💼',fShortName($nm),"Father's Sister",$cs) ?>
+                </div>
+                <?php endforeach; ?>
+              </div>
+              <?php else: ?>
+              <div style="width:136px;height:166px;border:2px dashed var(--hs-border);border-radius:14px;display:flex;align-items:center;justify-content:center;opacity:.35;">
+                <div style="text-align:center;font-size:11px;color:var(--hs-muted);">No paternal<br>aunts/uncles<br>recorded</div>
+              </div>
+              <?php endif; ?>
+            </div>
+
+          </div><!-- /aunts-uncles row -->
+
+          <!-- Two drops to cousins -->
+          <?php if ($couMat || $couPat): ?>
+          <div style="display:flex;width:100%;justify-content:space-around;padding:0 120px;">
+            <div class="c-v" style="height:36px;"></div>
+            <div class="c-v" style="height:36px;"></div>
+          </div>
+
+          <!-- ════════════════════════════════════
+               ROW 5 — COUSINS
+          ════════════════════════════════════ -->
+          <div class="ft-row" style="gap:60px;justify-content:center;align-items:flex-start;">
+
+            <!-- MATERNAL COUSINS -->
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0;">
+              <?php if ($couMat): ?>
+              <div class="sec-label" style="color:#1565C0;background:#EFF6FF;">Mother's Side Cousins</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                <?php foreach ($couMat as $nm=>$cs): ?>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+                  <?= fCard('🧒',fShortName($nm),'Maternal Cousin',$cs) ?>
+                  <div style="font-size:8.5px;color:var(--hs-muted);text-align:center;max-width:136px;line-height:1.3;"><?= htmlspecialchars($nm) ?></div>
+                </div>
+                <?php endforeach; ?>
+              </div>
+              <?php else: ?>
+              <div style="width:136px;height:140px;border:2px dashed var(--hs-border);border-radius:14px;display:flex;align-items:center;justify-content:center;opacity:.3;">
+                <div style="text-align:center;font-size:11px;color:var(--hs-muted);">No maternal<br>cousins recorded</div>
+              </div>
+              <?php endif; ?>
+            </div>
+
+            <!-- PATERNAL COUSINS -->
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0;">
+              <?php if ($couPat): ?>
+              <div class="sec-label" style="color:#7C3AED;background:#F5F3FF;">Father's Side Cousins</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                <?php foreach ($couPat as $nm=>$cs): ?>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+                  <?= fCard('🧒',fShortName($nm),'Paternal Cousin',$cs) ?>
+                  <div style="font-size:8.5px;color:var(--hs-muted);text-align:center;max-width:136px;line-height:1.3;"><?= htmlspecialchars($nm) ?></div>
+                </div>
+                <?php endforeach; ?>
+              </div>
+              <?php else: ?>
+              <div style="width:136px;height:140px;border:2px dashed var(--hs-border);border-radius:14px;display:flex;align-items:center;justify-content:center;opacity:.3;">
+                <div style="text-align:center;font-size:11px;color:var(--hs-muted);">No paternal<br>cousins recorded</div>
+              </div>
+              <?php endif; ?>
+            </div>
+
+          </div><!-- /cousins row -->
+          <?php endif; ?>
+
+        </div><!-- /ftree-v2 -->
+       </div><!-- /ft-inner -->
+      </div><!-- /ft-scroll -->
+
+      <!-- Legend -->
+      <div class="ft-legend">
+        <strong style="font-size:10.5px;color:var(--hs-muted);text-transform:uppercase;letter-spacing:.8px;">Risk:</strong>
+        <div class="ftleg-i"><span class="ftleg-d" style="background:#DC2626;"></span> High (Heart, Cancer, Stroke, BP, Diabetes)</div>
+        <div class="ftleg-i"><span class="ftleg-d" style="background:#D97706;"></span> Moderate (Thyroid, Anxiety, Obesity, Asthma)</div>
+        <div class="ftleg-i"><span class="ftleg-d" style="background:#16A34A;"></span> Low Risk</div>
+        <div class="ftleg-i"><span class="ftleg-d" style="border:1.5px dashed #9BAEC8;background:none;"></span> No data</div>
+        <div style="margin-left:auto;font-size:11px;color:var(--hs-muted);"><i class="fas fa-hand-pointer"></i> Click any card for full details</div>
+      </div>
+
+    </div><!-- /ft-page -->
+
+    <!-- ═══ PERSON DETAIL MODAL ═══ -->
+    <div id="personModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:3000;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
+      <div style="background:#fff;border-radius:20px;width:100%;max-width:540px;box-shadow:0 24px 80px rgba(10,31,68,.3);overflow:hidden;">
+        <div id="pmTop" style="padding:20px 24px;display:flex;align-items:center;gap:14px;">
+          <span id="pmAv" style="font-size:36px;"></span>
+          <div style="flex:1;"><div id="pmName" style="font-size:18px;font-weight:800;"></div><div id="pmRel" style="font-size:12px;opacity:.75;margin-top:2px;"></div></div>
+          <button onclick="document.getElementById('personModal').style.display='none'" style="background:rgba(255,255,255,.2);border:none;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:18px;color:inherit;">&times;</button>
+        </div>
+        <div id="pmBody" style="padding:0 24px 24px;max-height:70vh;overflow-y:auto;"></div>
+      </div>
+    </div>
+
+    <!-- ═══ ADD MEMBER MODAL ═══ -->
+    <div id="addMemberModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3000;align-items:center;justify-content:center;padding:20px;">
+      <div style="background:#fff;border-radius:16px;width:100%;max-width:460px;box-shadow:var(--shadow-lg);overflow:hidden;">
+        <div style="background:var(--hs-navy);color:#fff;padding:18px 24px;display:flex;justify-content:space-between;align-items:center;">
+          <h5 style="margin:0;font-size:16px;font-weight:700;"><i class="fas fa-user-plus"></i> Add Family Member</h5>
+          <button onclick="document.getElementById('addMemberModal').style.display='none'" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;">&times;</button>
+        </div>
+        <form method="POST" action="../api/family-history.php" style="padding:22px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+            <div>
+              <label class="form-label">Relation *</label>
+              <select name="relation" class="form-select" required>
+                <option value="">Select...</option>
+                <option value="father">Father</option><option value="mother">Mother</option>
+                <option value="brother">Brother</option><option value="sister">Sister</option>
+                <option value="grandfather_paternal">Grandfather (Father's side)</option>
+                <option value="grandmother_paternal">Grandmother (Father's side)</option>
+                <option value="grandfather_maternal">Grandfather (Mother's side)</option>
+                <option value="grandmother_maternal">Grandmother (Mother's side)</option>
+                <option value="uncle_paternal">Uncle (Father's Brother)</option>
+                <option value="aunt_paternal">Aunt (Father's Sister)</option>
+                <option value="uncle_maternal">Uncle (Mother's Brother)</option>
+                <option value="aunt_maternal">Aunt (Mother's Sister)</option>
+                <option value="cousin_paternal">Cousin (Father's side)</option>
+                <option value="cousin_maternal">Cousin (Mother's side)</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div><label class="form-label">Name</label><input type="text" name="relation_name" class="form-control" placeholder="Full name"></div>
+            <div style="grid-column:1/-1"><label class="form-label">Condition *</label><input type="text" name="condition_name" class="form-control" required placeholder="e.g. Type 2 Diabetes"></div>
+            <div><label class="form-label">Year Diagnosed</label><input type="number" name="year_diagnosed" class="form-control" placeholder="e.g. 2010" min="1900" max="2030"></div>
+            <div><label class="form-label">Year Deceased</label><input type="number" name="year_deceased" class="form-control" placeholder="Leave blank if alive" min="1900" max="2030"></div>
+            <div style="grid-column:1/-1"><label class="form-label">Notes (optional)</label><textarea name="notes" class="form-control" rows="2" placeholder="Additional details..."></textarea></div>
+          </div>
+          <button type="submit" class="btn-hs btn-primary-hs" style="width:100%;justify-content:center;"><i class="fas fa-save"></i> Save</button>
+        </form>
+      </div>
+    </div>
+
+    <script>
+    const HIGH_K=['heart','cancer','stroke','hypertension','cholesterol','diabetes','brca','coronary','atrial','angina','fibrillation'];
+    const MID_K =['thyroid','calcium','arthritis','anxiety','obesity','asthma','eczema','osteoporosis','fatty liver','degeneration'];
+    const RISK_NOTES={
+      heart:'Family history of heart disease doubles your cardiovascular risk. Discuss heart health screening with your GP.',
+      coronary:'Coronary artery disease has strong hereditary components. Regular BP and cholesterol checks are essential.',
+      stroke:'Family history of stroke increases your risk by up to 50%. Monitor BP, cholesterol and AF symptoms.',
+      hypertension:'Hypertension in a first-degree relative raises your lifetime risk by 25–50%. Regular monitoring is recommended.',
+      cholesterol:'Familial hypercholesterolaemia is inherited. A fasting lipid panel is strongly recommended for you.',
+      diabetes:'Type 2 diabetes risk increases up to 40% with an affected parent or sibling. Annual HbA1c screening advised.',
+      cancer:'Some cancers have genetic components. Discuss family history and screening schedules with your GP.',
+      brca:'BRCA gene variants significantly elevate breast/ovarian cancer risk. Genetic counselling is urgently recommended.',
+      thyroid:'Thyroid disorders and thyroid cancer can run in families. Annual TSH monitoring is prudent.',
+      anxiety:'Anxiety disorders have hereditary elements. CBT and mindfulness can be effective preventative strategies.',
+      obesity:'Obesity risk is partly hereditary. Combined with your diabetes family history, weight management is important.',
+      atrial:'Atrial fibrillation has genetic components and raises stroke risk. Report palpitations to your GP.',
+      osteoporosis:'Osteoporosis is partly hereditary. Ensure adequate calcium/vitamin D and consider a DEXA scan.',
+    };
+    function condColor(n){const t=n.toLowerCase();if(HIGH_K.some(k=>t.includes(k)))return'#DC2626';if(MID_K.some(k=>t.includes(k)))return'#D97706';return'#16A34A';}
+    function condBg(c){return{'#DC2626':'#FEE2E2','#D97706':'#FEF3C7','#16A34A':'#DCFCE7'}[c]||'#F1F5F9';}
+
+    function showP(e,data){
+      e.stopPropagation();
+      const p=typeof data==='string'?JSON.parse(data):data;
+      const conds=p.conds||[];
+      let rc='#1565C0';
+      const allT=conds.map(c=>c.condition_name.toLowerCase()).join(' ');
+      if(HIGH_K.some(k=>allT.includes(k)))rc='#DC2626';
+      else if(MID_K.some(k=>allT.includes(k)))rc='#D97706';
+      else if(conds.length)rc='#16A34A';
+      const top=document.getElementById('pmTop');
+      top.style.background=rc; top.style.color='#fff';
+      document.getElementById('pmAv').textContent=p.av;
+      document.getElementById('pmName').textContent=p.name;
+      document.getElementById('pmRel').textContent=p.rel+(p.dec?' · Deceased '+(p.dec_yr||''):'');
+      let body='';
+      if(!conds.length){
+        body='<p style="padding:20px;text-align:center;color:#5E7A99;">No medical conditions recorded for this family member.</p>';
+      } else {
+        conds.forEach(c=>{
+          const col=condColor(c.condition_name),bg=condBg(col);
+          let note='';
+          for(const[k,v]of Object.entries(RISK_NOTES)){if(c.condition_name.toLowerCase().includes(k)){note=v;break;}}
+          body+=`<div style="border-left:4px solid ${col};border-radius:10px;padding:14px 16px;margin-bottom:12px;background:${bg}44;border:1px solid ${col}22;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:6px;">
+              <div style="font-weight:800;font-size:14px;color:#0A1F44;">${c.condition_name}</div>
+              ${c.year_diagnosed?`<span style="background:${bg};color:${col};padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;">Diagnosed ${c.year_diagnosed}</span>`:''}
+            </div>
+            ${c.notes?`<p style="font-size:13px;color:#374151;margin:0 0 8px;line-height:1.6;">${c.notes}</p>`:''}
+            ${note?`<div style="display:flex;gap:8px;background:rgba(255,255,255,.8);border-radius:7px;padding:9px 12px;margin-top:8px;"><i class="fas fa-dna" style="color:${col};margin-top:2px;flex-shrink:0;font-size:13px;"></i><div style="font-size:12.5px;color:#374151;line-height:1.5;"><strong>Your genetic risk:</strong> ${note}</div></div>`:''}
+          </div>`;
+        });
+        body+=`<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start;">
+          <i class="fas fa-lightbulb" style="color:#1565C0;margin-top:2px;flex-shrink:0;"></i>
+          <div style="font-size:12.5px;color:#1E40AF;line-height:1.6;"><strong>NHS Recommendation:</strong> Share this family history with your GP. Genetic risk factors can be managed through early screening, lifestyle changes, and preventive care.
+          <br><a href="appointments.php" style="color:#1565C0;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:4px;margin-top:6px;"><i class="fas fa-calendar-plus"></i> Book appointment with your doctor</a></div>
+        </div>`;
+      }
+      document.getElementById('pmBody').innerHTML=body;
+      document.getElementById('personModal').style.display='flex';
+    }
+    ['personModal','addMemberModal'].forEach(id=>{
+      document.getElementById(id).addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
+    });
+    </script>
+
+    <?php endif; ?>
