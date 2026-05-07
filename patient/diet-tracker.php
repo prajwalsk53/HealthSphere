@@ -360,58 +360,211 @@ $recs = [
   </div>
 </div>
 
-<!-- Add Meal Modal -->
-<div id="addMealModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;align-items:center;justify-content:center;padding:20px;">
-  <div style="background:#fff;border-radius:16px;width:100%;max-width:480px;box-shadow:var(--shadow-lg);overflow:hidden;">
-    <div style="background:var(--hs-navy);color:#fff;padding:18px 24px;display:flex;justify-content:space-between;align-items:center;">
-      <h5 style="margin:0;font-size:16px;font-weight:700;"><i class="fas fa-utensils"></i> Log Meal</h5>
-      <button onclick="document.getElementById('addMealModal').style.display='none'" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;">×</button>
+<!-- ── Log Meal Modal ──────────────────────────────────────────────── -->
+<style>
+.meal-type-tabs { display:flex; gap:6px; margin-bottom:18px; }
+.mtt-btn {
+  flex:1; padding:9px 6px; border-radius:10px; border:2px solid var(--hs-border);
+  background:#fff; font-size:12px; font-weight:700; cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  color:var(--hs-muted); transition:var(--transition);
+}
+.mtt-btn:hover { border-color:var(--hs-blue); color:var(--hs-blue); background:#EFF6FF; }
+.mtt-btn.active { border-color:var(--hs-blue); background:var(--hs-blue); color:#fff; }
+.mtt-emoji { font-size:18px; }
+
+.food-search-wrap { position:relative; margin-bottom:14px; }
+.food-search-wrap .fs-icon {
+  position:absolute; left:12px; top:50%; transform:translateY(-50%);
+  color:var(--hs-muted); font-size:14px; pointer-events:none;
+}
+.food-search-wrap input { padding-left:36px !important; }
+
+#foodDropdown {
+  position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:3000;
+  background:#fff; border:1.5px solid var(--hs-border); border-radius:12px;
+  box-shadow:0 8px 24px rgba(10,31,68,.14); max-height:280px; overflow-y:auto;
+  display:none;
+}
+.fd-item {
+  display:flex; align-items:center; gap:12px; padding:10px 14px;
+  cursor:pointer; transition:background .15s; border-bottom:1px solid #F3F4F6;
+}
+.fd-item:last-child { border-bottom:none; }
+.fd-item:hover { background:#EFF6FF; }
+.fd-icon {
+  width:36px; height:36px; border-radius:10px; display:flex; align-items:center;
+  justify-content:center; font-size:16px; flex-shrink:0;
+}
+.fd-info { flex:1; min-width:0; }
+.fd-name { font-size:13px; font-weight:700; color:var(--hs-navy); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fd-meta { font-size:11px; color:var(--hs-muted); margin-top:2px; }
+.fd-cal { font-size:12px; font-weight:700; color:var(--hs-blue); flex-shrink:0; }
+.fd-rating { font-size:10px; font-weight:700; padding:2px 7px; border-radius:8px; flex-shrink:0; }
+.fd-rating.excellent { background:#DCFCE7; color:#166534; }
+.fd-rating.good      { background:#DBEAFE; color:#1E40AF; }
+.fd-rating.moderate  { background:#FEF3C7; color:#92400E; }
+.fd-rating.poor      { background:#FEE2E2; color:#991B1B; }
+.fd-empty { padding:20px; text-align:center; color:var(--hs-muted); font-size:13px; }
+
+#selectedFoodCard {
+  background: linear-gradient(135deg,#EFF6FF,#F0FDF4);
+  border:1.5px solid #BFDBFE; border-radius:12px; padding:14px 16px;
+  margin-bottom:14px; animation:fadeInCard .25s ease;
+}
+@keyframes fadeInCard { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:none} }
+.macro-pills { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+.macro-pill {
+  display:flex; flex-direction:column; align-items:center;
+  padding:6px 12px; border-radius:10px; background:#fff;
+  border:1.5px solid var(--hs-border); min-width:62px;
+}
+.macro-pill .mp-val { font-size:14px; font-weight:900; color:var(--hs-navy); }
+.macro-pill .mp-lbl { font-size:9.5px; font-weight:700; color:var(--hs-muted); text-transform:uppercase; letter-spacing:.4px; margin-top:1px; }
+
+.portion-row { display:flex; align-items:center; gap:10px; margin-top:12px; }
+.portion-row label { font-size:12.5px; font-weight:700; color:var(--hs-navy); white-space:nowrap; }
+.portion-row input { width:80px; text-align:center; font-weight:700; }
+.portion-row .hint { font-size:11px; color:var(--hs-muted); }
+
+.manual-toggle {
+  font-size:12px; color:var(--hs-blue); background:none; border:none;
+  cursor:pointer; text-decoration:underline; padding:0; margin-bottom:10px;
+}
+</style>
+
+<div id="addMealModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:18px;width:100%;max-width:540px;box-shadow:0 20px 60px rgba(10,31,68,.25);overflow:hidden;max-height:90vh;display:flex;flex-direction:column;">
+
+    <!-- Header -->
+    <div style="background:var(--hs-navy);color:#fff;padding:18px 24px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+      <div>
+        <div style="font-size:16px;font-weight:800;"><i class="fas fa-utensils"></i> Log Meal</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:2px;">Search our food database or enter manually</div>
+      </div>
+      <button onclick="closeMealModal()" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button>
     </div>
-    <form method="POST" style="padding:24px;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-        <div>
-          <label class="form-label">Meal Type *</label>
-          <select name="meal_type" id="mealTypeSelect" class="form-select" required>
-            <option value="breakfast">Breakfast</option>
-            <option value="lunch">Lunch</option>
-            <option value="snack">Snack</option>
-            <option value="dinner">Dinner</option>
-          </select>
+
+    <form method="POST" style="padding:20px 24px 24px;overflow-y:auto;flex:1;">
+
+      <!-- Meal type tabs -->
+      <div style="margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:700;color:var(--hs-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">Meal Type</div>
+        <div class="meal-type-tabs">
+          <button type="button" class="mtt-btn active" data-type="breakfast" onclick="setMealType('breakfast',this)">
+            <span class="mtt-emoji">🌅</span>Breakfast
+          </button>
+          <button type="button" class="mtt-btn" data-type="lunch" onclick="setMealType('lunch',this)">
+            <span class="mtt-emoji">☀️</span>Lunch
+          </button>
+          <button type="button" class="mtt-btn" data-type="snack" onclick="setMealType('snack',this)">
+            <span class="mtt-emoji">🍎</span>Snack
+          </button>
+          <button type="button" class="mtt-btn" data-type="dinner" onclick="setMealType('dinner',this)">
+            <span class="mtt-emoji">🌙</span>Dinner
+          </button>
         </div>
-        <div>
+        <input type="hidden" name="meal_type" id="mealTypeSelect" value="breakfast">
+      </div>
+
+      <!-- Food search -->
+      <div style="margin-bottom:4px;">
+        <div style="font-size:11px;font-weight:700;color:var(--hs-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">Search Food</div>
+        <div class="food-search-wrap">
+          <i class="fas fa-search fs-icon"></i>
+          <input type="text" id="foodSearchInput" class="form-control"
+            placeholder="e.g. Grilled Chicken, Oats, Salmon, Broccoli…"
+            autocomplete="off"
+            oninput="onFoodSearch(this.value)"
+            onfocus="onFoodSearch(this.value)">
+          <div id="foodDropdown"></div>
+        </div>
+      </div>
+
+      <!-- Selected food card -->
+      <div id="selectedFoodCard" style="display:none;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+          <span id="sfcEmoji" style="font-size:24px;"></span>
+          <div style="flex:1;">
+            <div id="sfcName" style="font-size:14px;font-weight:800;color:var(--hs-navy);"></div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:3px;">
+              <span id="sfcCategory" style="font-size:11px;background:#DBEAFE;color:#1E40AF;padding:2px 8px;border-radius:8px;font-weight:700;"></span>
+              <span id="sfcRating" class="fd-rating"></span>
+              <span id="sfcPortion" style="font-size:11px;color:var(--hs-muted);"></span>
+            </div>
+          </div>
+          <button type="button" onclick="clearSelectedFood()" style="background:none;border:none;cursor:pointer;color:var(--hs-muted);font-size:16px;" title="Clear selection">×</button>
+        </div>
+
+        <div class="portion-row">
+          <label>Portion:</label>
+          <input type="number" id="portionInput" class="form-control" value="100" min="1" max="2000" oninput="recalcMacros()">
+          <span style="font-size:13px;font-weight:700;color:var(--hs-muted);">g</span>
+          <span class="hint" id="portionHint"></span>
+        </div>
+
+        <div class="macro-pills" id="macroPills">
+          <div class="macro-pill"><div class="mp-val" id="mp-cal">0</div><div class="mp-lbl">kcal</div></div>
+          <div class="macro-pill"><div class="mp-val" id="mp-prot">0g</div><div class="mp-lbl">Protein</div></div>
+          <div class="macro-pill"><div class="mp-val" id="mp-carbs">0g</div><div class="mp-lbl">Carbs</div></div>
+          <div class="macro-pill"><div class="mp-val" id="mp-fats">0g</div><div class="mp-lbl">Fats</div></div>
+          <div class="macro-pill"><div class="mp-val" id="mp-fiber">0g</div><div class="mp-lbl">Fiber</div></div>
+        </div>
+      </div>
+
+      <!-- Hidden actual form fields (populated by JS) -->
+      <input type="hidden" name="food_name" id="foodNameInput">
+      <input type="hidden" name="calories"  id="calInput">
+      <input type="hidden" name="protein"   id="protInput">
+      <input type="hidden" name="carbs"     id="carbsInput">
+      <input type="hidden" name="fats"      id="fatsInput">
+      <input type="hidden" name="fiber"     id="fiberInput">
+
+      <!-- Manual entry toggle -->
+      <div style="margin-top:12px;">
+        <button type="button" class="manual-toggle" onclick="toggleManual()">
+          <i class="fas fa-pencil-alt" style="font-size:10px;"></i> Food not found? Enter manually
+        </button>
+      </div>
+
+      <!-- Manual fields (hidden by default) -->
+      <div id="manualFields" style="display:none;border-top:1px solid var(--hs-border);padding-top:14px;margin-top:4px;">
+        <div style="margin-bottom:12px;">
           <label class="form-label">Food Name *</label>
-          <input type="text" name="food_name" id="foodNameInput" class="form-control" placeholder="e.g. Grilled Chicken" required>
+          <input type="text" id="manualFoodName" class="form-control" placeholder="e.g. Homemade Dal, Protein Bar…">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div>
+            <label class="form-label">Calories (kcal)</label>
+            <input type="number" id="manualCal" class="form-control" placeholder="0" min="0" step="1">
+          </div>
+          <div>
+            <label class="form-label">Protein (g)</label>
+            <input type="number" id="manualProt" class="form-control" placeholder="0" min="0" step="0.1">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+          <div>
+            <label class="form-label">Carbs (g)</label>
+            <input type="number" id="manualCarbs" class="form-control" placeholder="0" min="0" step="0.1">
+          </div>
+          <div>
+            <label class="form-label">Fats (g)</label>
+            <input type="number" id="manualFats" class="form-control" placeholder="0" min="0" step="0.1">
+          </div>
+          <div>
+            <label class="form-label">Fiber (g)</label>
+            <input type="number" id="manualFiber" class="form-control" placeholder="0" min="0" step="0.1">
+          </div>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-        <div>
-          <label class="form-label">Calories (kcal)</label>
-          <input type="number" name="calories" id="calInput" class="form-control" placeholder="0" min="0" step="0.1">
-        </div>
-        <div>
-          <label class="form-label">Protein (g)</label>
-          <input type="number" name="protein" id="protInput" class="form-control" placeholder="0" min="0" step="0.1">
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;">
-        <div>
-          <label class="form-label">Carbs (g)</label>
-          <input type="number" name="carbs" class="form-control" placeholder="0" min="0" step="0.1">
-        </div>
-        <div>
-          <label class="form-label">Fats (g)</label>
-          <input type="number" name="fats" class="form-control" placeholder="0" min="0" step="0.1">
-        </div>
-        <div>
-          <label class="form-label">Fiber (g)</label>
-          <input type="number" name="fiber" class="form-control" placeholder="0" min="0" step="0.1">
-        </div>
-      </div>
-      <div style="display:flex;gap:12px;">
-        <button type="submit" name="add_meal" class="btn-hs btn-primary-hs" style="flex:1;justify-content:center;">
+
+      <!-- Submit -->
+      <div style="display:flex;gap:12px;margin-top:20px;">
+        <button type="submit" name="add_meal" id="addMealBtn" class="btn-hs btn-primary-hs" style="flex:1;justify-content:center;" onclick="prepareSubmit()">
           <i class="fas fa-plus"></i> Add Meal
         </button>
-        <button type="button" onclick="document.getElementById('addMealModal').style.display='none'" class="btn-hs btn-outline-hs">Cancel</button>
+        <button type="button" onclick="closeMealModal()" class="btn-hs btn-outline-hs">Cancel</button>
       </div>
     </form>
   </div>
@@ -524,24 +677,186 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// ── Meal modal helpers ────────────────────────────────────────────────
+let selectedFood = null;   // currently picked food object from DB
+let manualMode   = false;
+
+const CATEGORY_EMOJI = {
+  'Protein':'🍗','Fish':'🐟','Grain':'🌾','Vegetable':'🥦','Fruit':'🍎',
+  'Dairy':'🥛','Processed':'🏭','Legume':'🫘','Nut':'🥜','default':'🍽️'
+};
+
 function openAddMeal(type) {
+  setMealType(type || 'breakfast', document.querySelector(`.mtt-btn[data-type="${type||'breakfast'}"]`));
+  document.getElementById('addMealModal').style.display = 'flex';
+  // Load popular foods on open
+  onFoodSearch('');
+  setTimeout(() => document.getElementById('foodSearchInput').focus(), 120);
+}
+
+function closeMealModal() {
+  document.getElementById('addMealModal').style.display = 'none';
+  clearSelectedFood();
+  document.getElementById('foodSearchInput').value = '';
+  document.getElementById('foodDropdown').style.display = 'none';
+  if (manualMode) toggleManual();
+}
+
+function setMealType(type, btn) {
   document.getElementById('mealTypeSelect').value = type;
-  document.getElementById('addMealModal').style.display = 'flex';
+  document.querySelectorAll('.mtt-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  else document.querySelector(`.mtt-btn[data-type="${type}"]`)?.classList.add('active');
 }
 
-function quickAddFood(name, cal, prot, sugar, fat, fiber) {
-  document.getElementById('foodNameInput').value = name;
-  document.getElementById('calInput').value = cal;
-  document.getElementById('protInput').value = prot;
-  document.getElementById('addMealModal').style.display = 'flex';
+// ── Food search live dropdown ─────────────────────────────────────────
+let searchTimer = null;
+async function onFoodSearch(q) {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(async () => {
+    const drop = document.getElementById('foodDropdown');
+    drop.innerHTML = '<div class="fd-empty"><i class="fas fa-circle-notch fa-spin"></i></div>';
+    drop.style.display = 'block';
+    try {
+      const res   = await fetch(`/HealthSphere/api/food-search.php?q=${encodeURIComponent(q)}`);
+      const foods = await res.json();
+      renderDropdown(foods, q);
+    } catch(e) {
+      drop.innerHTML = '<div class="fd-empty">Could not load foods.</div>';
+    }
+  }, q.length ? 200 : 0);
 }
 
-document.getElementById('foodSearch').addEventListener('input', function() {
-  const q = this.value.toLowerCase();
-  document.querySelectorAll('.food-item').forEach(item => {
-    item.style.display = item.textContent.toLowerCase().includes(q) ? '' : 'none';
-  });
+function renderDropdown(foods, q) {
+  const drop = document.getElementById('foodDropdown');
+  if (!foods.length) {
+    drop.innerHTML = `<div class="fd-empty">No foods found for "<b>${q}</b>".<br><small>Use "Enter manually" below.</small></div>`;
+    drop.style.display = 'block';
+    return;
+  }
+  const hl = (str) => {
+    if (!q) return str;
+    return str.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'), '<mark style="background:#FEF08A;border-radius:2px;">$1</mark>');
+  };
+  drop.innerHTML = foods.map(f => {
+    const emoji = CATEGORY_EMOJI[f.category] || CATEGORY_EMOJI.default;
+    const catColors = {Protein:'#FEE2E2',Fish:'#DBEAFE',Grain:'#FEF3C7',Vegetable:'#DCFCE7',Fruit:'#FCE7F3',Dairy:'#F0F9FF',Processed:'#F3F4F6'};
+    const bg = catColors[f.category] || '#F3F4F6';
+    return `<div class="fd-item" onclick='selectFood(${JSON.stringify(f)})'>
+      <div class="fd-icon" style="background:${bg};">${emoji}</div>
+      <div class="fd-info">
+        <div class="fd-name">${hl(f.food_name)}</div>
+        <div class="fd-meta">${f.category} · ${f.portion_size || '100g serving'}</div>
+      </div>
+      <span class="fd-rating ${f.health_rating}">${f.health_rating}</span>
+      <div class="fd-cal">${Math.round(f.calories_per_100g)}<br><span style="font-size:9px;font-weight:500;">kcal/100g</span></div>
+    </div>`;
+  }).join('');
+  drop.style.display = 'block';
+}
+
+function selectFood(food) {
+  selectedFood = food;
+  document.getElementById('foodSearchInput').value = food.food_name;
+  document.getElementById('foodDropdown').style.display = 'none';
+
+  const emoji = CATEGORY_EMOJI[food.category] || CATEGORY_EMOJI.default;
+  document.getElementById('sfcEmoji').textContent    = emoji;
+  document.getElementById('sfcName').textContent     = food.food_name;
+  document.getElementById('sfcCategory').textContent = food.category;
+
+  const ratingEl = document.getElementById('sfcRating');
+  ratingEl.textContent  = food.health_rating;
+  ratingEl.className    = `fd-rating ${food.health_rating}`;
+
+  // Parse suggested portion from e.g. "150g / 1 fillet"
+  const portionMatch = (food.portion_size || '').match(/(\d+)g/);
+  const suggestedG   = portionMatch ? parseInt(portionMatch[1]) : 100;
+  document.getElementById('portionInput').value = suggestedG;
+  document.getElementById('portionHint').textContent = food.portion_size ? `Suggested: ${food.portion_size}` : '';
+
+  document.getElementById('selectedFoodCard').style.display = 'block';
+  recalcMacros();
+
+  // If in manual mode, exit it
+  if (manualMode) toggleManual();
+}
+
+function recalcMacros() {
+  if (!selectedFood) return;
+  const portion = parseFloat(document.getElementById('portionInput').value) || 100;
+  const factor  = portion / 100;
+  const cal   = Math.round(selectedFood.calories_per_100g * factor);
+  const prot  = (selectedFood.protein_g  * factor).toFixed(1);
+  const carbs = (selectedFood.sugar_g    * factor).toFixed(1);
+  const fats  = (selectedFood.fats_g     * factor).toFixed(1);
+  const fiber = (selectedFood.fiber_g    * factor).toFixed(1);
+
+  document.getElementById('mp-cal').textContent   = cal;
+  document.getElementById('mp-prot').textContent  = prot + 'g';
+  document.getElementById('mp-carbs').textContent = carbs + 'g';
+  document.getElementById('mp-fats').textContent  = fats + 'g';
+  document.getElementById('mp-fiber').textContent = fiber + 'g';
+
+  // Colour the calorie pill by value
+  const calPill = document.getElementById('mp-cal').closest('.macro-pill');
+  calPill.style.borderColor = cal > 600 ? '#FCA5A5' : cal > 300 ? '#FCD34D' : '#86EFAC';
+}
+
+function clearSelectedFood() {
+  selectedFood = null;
+  document.getElementById('selectedFoodCard').style.display = 'none';
+  document.getElementById('foodSearchInput').value = '';
+}
+
+function toggleManual() {
+  manualMode = !manualMode;
+  document.getElementById('manualFields').style.display = manualMode ? 'block' : 'none';
+  document.querySelector('.manual-toggle').innerHTML = manualMode
+    ? '<i class="fas fa-search" style="font-size:10px;"></i> Search food database instead'
+    : '<i class="fas fa-pencil-alt" style="font-size:10px;"></i> Food not found? Enter manually';
+  if (manualMode) clearSelectedFood();
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.food-search-wrap')) {
+    document.getElementById('foodDropdown').style.display = 'none';
+  }
 });
+
+// Populate hidden form fields just before submit
+function prepareSubmit() {
+  if (manualMode) {
+    const name = document.getElementById('manualFoodName').value.trim();
+    if (!name) { alert('Please enter a food name.'); return false; }
+    document.getElementById('foodNameInput').value = name;
+    document.getElementById('calInput').value   = document.getElementById('manualCal').value   || 0;
+    document.getElementById('protInput').value  = document.getElementById('manualProt').value  || 0;
+    document.getElementById('carbsInput').value = document.getElementById('manualCarbs').value || 0;
+    document.getElementById('fatsInput').value  = document.getElementById('manualFats').value  || 0;
+    document.getElementById('fiberInput').value = document.getElementById('manualFiber').value || 0;
+  } else if (selectedFood) {
+    const portion = parseFloat(document.getElementById('portionInput').value) || 100;
+    const factor  = portion / 100;
+    document.getElementById('foodNameInput').value = selectedFood.food_name;
+    document.getElementById('calInput').value   = Math.round(selectedFood.calories_per_100g * factor);
+    document.getElementById('protInput').value  = (selectedFood.protein_g * factor).toFixed(1);
+    document.getElementById('carbsInput').value = (selectedFood.sugar_g   * factor).toFixed(1);
+    document.getElementById('fatsInput').value  = (selectedFood.fats_g    * factor).toFixed(1);
+    document.getElementById('fiberInput').value = (selectedFood.fiber_g   * factor).toFixed(1);
+  } else {
+    alert('Please search and select a food, or use "Enter manually".');
+    return false;
+  }
+}
+
+// quickAddFood: called from recommendation cards (kept for backwards compat)
+function quickAddFood(name) {
+  document.getElementById('addMealModal').style.display = 'flex';
+  document.getElementById('foodSearchInput').value = name;
+  onFoodSearch(name);
+}
 </script>
 </body>
 </html>
