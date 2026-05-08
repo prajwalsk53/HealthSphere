@@ -632,7 +632,7 @@ async function sendMealMsg() {
   showTyping();
 
   try {
-    const res = await fetch('/HealthSphere/api/meal-ai.php', {
+    const res = await fetch('<?= BASE_PATH ?>/api/meal-ai.php', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({message:text, history:aiHistory.slice(-8)}),
@@ -723,8 +723,8 @@ async function onFoodSearch(q) {
     try {
       // Fire both requests simultaneously
       const [localRes, spoonRes] = await Promise.allSettled([
-        fetch(`/HealthSphere/api/food-search.php?q=${encodeURIComponent(q)}`),
-        fetch(`/HealthSphere/api/spoonacular-search.php?q=${encodeURIComponent(q)}`),
+        fetch(`<?= BASE_PATH ?>/api/food-search.php?q=${encodeURIComponent(q)}`),
+        fetch(`<?= BASE_PATH ?>/api/spoonacular-search.php?q=${encodeURIComponent(q)}`),
       ]);
 
       const localFoods = localRes.status === 'fulfilled'
@@ -824,7 +824,7 @@ async function handleFoodSelect(food) {
     // Show card in loading state first
     showFoodCard(food, true);
     try {
-      const res  = await fetch(`/HealthSphere/api/spoonacular-info.php?id=${food.spoonacular_id}`);
+      const res  = await fetch(`<?= BASE_PATH ?>/api/spoonacular-info.php?id=${food.spoonacular_id}`);
       const info = await res.json();
       if (info.ok) {
         // Merge full macro data into the food object

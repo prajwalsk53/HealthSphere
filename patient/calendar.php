@@ -515,7 +515,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load events from API
     events: {
-      url:    '/HealthSphere/api/appointments.php?action=calendar',
+      url:    '<?= BASE_PATH ?>/api/appointments.php?action=calendar',
       method: 'GET',
     },
 
@@ -536,7 +536,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const newDate = event.startStr.split('T')[0];
       const newTime = event.startStr.split('T')[1] || '09:00:00';
 
-      fetch('/HealthSphere/api/appointments.php?action=move', {
+      fetch('<?= BASE_PATH ?>/api/appointments.php?action=move', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: event.id, date: newDate, time: newTime }),
@@ -626,7 +626,7 @@ function closePopup() {
 function cancelEvent() {
   if (!currentPopupId) return;
   if (!confirm('Cancel this appointment?')) return;
-  fetch('/HealthSphere/api/appointments.php?action=cancel', {
+  fetch('<?= BASE_PATH ?>/api/appointments.php?action=cancel', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: currentPopupId }),
@@ -697,7 +697,7 @@ function confirmBooking() {
   const btn = document.getElementById('confirmBookBtn');
   btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Booking...';
 
-  fetch('/HealthSphere/api/appointments.php?action=book', {
+  fetch('<?= BASE_PATH ?>/api/appointments.php?action=book', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

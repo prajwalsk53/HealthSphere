@@ -6,7 +6,7 @@ $initials = strtoupper(substr($user['first_name'], 0, 1) . substr($user['last_na
 $notifCount = isLoggedIn() ? getUnreadCount($pdo, $user['id']) : 0;
 $msgCount   = isLoggedIn() ? getUnreadMessages($pdo, $user['id']) : 0;
 
-$base = '/HealthSphere';
+$base = defined('BASE_PATH') ? BASE_PATH : '/HealthSphere';
 
 $navByRole = [
     'patient' => [

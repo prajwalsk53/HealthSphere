@@ -1039,7 +1039,7 @@ async function saveProfile() {
   };
 
   try {
-    const res  = await fetch('/HealthSphere/api/safe-appetite-scan.php', {
+    const res  = await fetch('<?= BASE_PATH ?>/api/safe-appetite-scan.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -1119,7 +1119,7 @@ async function runScan() {
     </div>`;
 
   try {
-    const res  = await fetch('/HealthSphere/api/safe-appetite-scan.php', {
+    const res  = await fetch('<?= BASE_PATH ?>/api/safe-appetite-scan.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'scan', product_name: product, ingredients }),
@@ -1220,7 +1220,7 @@ function renderScanResult(r, resultKey) {
 // ── Delete scan history ───────────────────────────────────────────────
 async function deleteScan(id) {
   if (!confirm('Delete this scan from history?')) return;
-  await fetch('/HealthSphere/api/safe-appetite-scan.php', {
+  await fetch('<?= BASE_PATH ?>/api/safe-appetite-scan.php', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'delete_scan', scan_id: id }),

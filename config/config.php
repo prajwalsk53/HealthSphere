@@ -1,8 +1,17 @@
 <?php
 define('APP_NAME', 'HealthSphere');
 define('APP_VERSION', '2.0');
-define('BASE_URL', 'http://localhost/HealthSphere');
 define('SESSION_LIFETIME', 3600);
+
+// ── Environment detection ───────────────────────────────────────────
+// Automatically uses the correct base path on localhost vs live domain.
+$_isLocal = ($_SERVER['HTTP_HOST'] ?? '') === 'localhost'
+         || str_starts_with($_SERVER['HTTP_HOST'] ?? '', '127.')
+         || str_starts_with($_SERVER['HTTP_HOST'] ?? '', '192.168.');
+
+define('IS_LOCAL',   $_isLocal);
+define('BASE_URL',   $_isLocal ? 'http://localhost/HealthSphere' : 'https://healthsphere.info');
+define('BASE_PATH',  $_isLocal ? '/HealthSphere' : '');
 
 // ── Google reCAPTCHA v2 ─────────────────────────────────────────────
 define('RECAPTCHA_SITE_KEY',   '6Ld4cogsAAAAAG9o_s6-zM8Qh2FZM9ZXwXuMHLHg');

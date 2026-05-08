@@ -503,7 +503,7 @@ async function sendMessage() {
   showTyping();
 
   try {
-    const res = await fetch('/HealthSphere/api/ai-assistant.php', {
+    const res = await fetch('<?= BASE_PATH ?>/api/ai-assistant.php', {
       method:  'POST',
       headers: {'Content-Type':'application/json'},
       body:    JSON.stringify({ message:text, history:chatHistory.slice(-10) }),
