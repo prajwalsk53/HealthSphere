@@ -85,28 +85,36 @@ foreach ($history as $h) {
 }
 $messages[] = ['role' => 'user', 'content' => $message];
 
-// ── Call Claude API (if key set) ───────────────────────────────────
-$apiKey = defined('ANTHROPIC_API_KEY') ? ANTHROPIC_API_KEY : '';
+// ── Call Gemini API (if key set) ───────────────────────────────────
+$apiKey = defined('GEMINI_API_KEY') ? GEMINI_API_KEY : '';
 
 if ($apiKey) {
+    // Convert history to Gemini format (role: user|model)
+    $geminiContents = [];
+    foreach ($history as $h) {
+        if (!in_array($h['role'] ?? '', ['user', 'assistant']) || empty($h['content'])) continue;
+        $geminiContents[] = [
+            'role'  => $h['role'] === 'assistant' ? 'model' : 'user',
+            'parts' => [['text' => (string)$h['content']]],
+        ];
+    }
+    $geminiContents[] = ['role' => 'user', 'parts' => [['text' => $message]]];
+
     $payload = [
-        'model'      => AI_MODEL,
-        'max_tokens' => AI_MAX_TOKENS,
-        'system'     => $systemPrompt,
-        'messages'   => $messages,
+        'system_instruction' => ['parts' => [['text' => $systemPrompt]]],
+        'contents'           => $geminiContents,
+        'generationConfig'   => ['maxOutputTokens' => AI_MAX_TOKENS],
     ];
 
-    $ch = curl_init('https://api.anthropic.com/v1/messages');
+    $url = 'https://generativelanguage.googleapis.com/v1beta/models/' . AI_MODEL . ':generateContent?key=' . $apiKey;
+
+    $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST           => true,
         CURLOPT_TIMEOUT        => 30,
-        CURLOPT_HTTPHEADER     => [
-            'x-api-key: '         . $apiKey,
-            'anthropic-version: 2023-06-01',
-            'content-type: application/json',
-        ],
-        CURLOPT_POSTFIELDS => json_encode($payload),
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+        CURLOPT_POSTFIELDS     => json_encode($payload),
     ]);
 
     $raw  = curl_exec($ch);
@@ -119,11 +127,11 @@ if ($apiKey) {
         $apiKey = '';
     } else {
         $result = json_decode($raw, true);
-        $reply  = $result['content'][0]['text'] ?? null;
+        $reply  = $result['candidates'][0]['content']['parts'][0]['text'] ?? null;
         if ($reply) {
             echo json_encode([
                 'reply'  => $reply,
-                'source' => 'claude',
+                'source' => 'gemini',
                 'model'  => AI_MODEL,
             ]);
             exit;

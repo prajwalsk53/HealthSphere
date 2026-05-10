@@ -230,7 +230,7 @@ html,body { height:100%; overflow:hidden; }
         <div class="page-title">HealthSphere AI Assistant</div>
         <div class="page-subtitle" style="display:flex;align-items:center;gap:6px;">
           <span style="width:7px;height:7px;border-radius:50%;background:#22C55E;display:inline-block;"></span>
-          Powered by Claude AI &middot; Medical knowledge base
+          Powered by Gemini AI &middot; Medical knowledge base
         </div>
       </div>
     </div>
@@ -515,8 +515,8 @@ async function sendMessage() {
     if (data.error) throw new Error(data.error);
 
     const reply  = data.reply || 'I could not generate a response. Please try again.';
-    const source = data.source === 'claude'
-      ? `<i class="fas fa-magic" style="color:var(--hs-blue);"></i> Claude AI`
+    const source = data.source === 'gemini'
+      ? `<i class="fas fa-magic" style="color:#4285F4;"></i> Gemini AI`
       : `<i class="fas fa-database" style="color:var(--hs-muted);"></i> Built-in`;
 
     const msgEl = appendMessage('ai', '', source);

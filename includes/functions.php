@@ -35,7 +35,7 @@ function requireLogin(string $redirect = '/HealthSphere/index.php'): void {
     }
 }
 
-function requireRole(string|array $roles, string $redirect = '/HealthSphere/index.php'): void {
+function requireRole($roles, string $redirect = '/HealthSphere/index.php'): void {
     requireLogin($redirect);
     $allowed = is_array($roles) ? $roles : [$roles];
     if (!in_array($_SESSION['user_role'] ?? '', $allowed)) {
