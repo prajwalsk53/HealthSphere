@@ -14,27 +14,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install lftp
-        run: sudo apt-get install -y lftp
-
-      - name: Setup SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SFTP_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p 22 access-5020406432.webspace-host.com >> ~/.ssh/known_hosts
-
-      - name: Deploy via SFTP
-        run: |
-          lftp -e "
-            set sftp:connect-program 'ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no';
-            open sftp://${{ secrets.SFTP_USER }}@access-5020406432.webspace-host.com:22;
-            mirror --reverse --delete --verbose \
-              --exclude='^\.git' \
-              --exclude='config/mail\.php' \
-              --exclude='^logs/' \
-              --exclude='^sql/' \
-              --exclude='.*\.sql$' \
-              ./ /HealthSphere/;
-            quit
-          "
+      - name: Deploy via FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: access-5020406432.webspace-host.com
+          username: ${{ secrets.SFTP_USER }}
+          password: ${{ secrets.SFTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          local-dir: ./
+          server-dir: /HealthSphere/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            config/mail.php
+            logs/**
+            sql/**
+            **.sql
