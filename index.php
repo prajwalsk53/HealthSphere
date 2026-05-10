@@ -25,10 +25,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = '⏳ Your account is pending admin approval. You will be notified by email once approved.';
                 $user = null;
             } elseif ($user['approval_status'] === 'rejected') {
-                $error = '❌ Your application was not approved. Reason: '.($user['rejection_reason']??'Please contact admin@healthsphere.nhs.uk');
+                $error = '❌ Your application was not approved. Reason: '.($user['rejection_reason']??'Please contact admin@healthsphere.info');
                 $user = null;
             } elseif (!$user['is_active']) {
-                $error = 'Your account has been suspended. Please contact admin@healthsphere.nhs.uk';
+                $error = 'Your account has been suspended. Please contact admin@healthsphere.info';
                 $user = null;
             }
         }
@@ -474,7 +474,7 @@ html, body { height: 100%; font-family: 'Inter', sans-serif; }
           $demos = [
             ['Emma Patel',     'emma.patel@email.com',               'Patient',      'rb-p','🧑','#DBEAFE'],
             ['Dr. Emma Hall',  'emma.hall@leicesterhospital.nhs.uk', 'Doctor',       'rb-d','👩‍⚕️','#DCFCE7'],
-            ['System Admin',   'admin@healthsphere.nhs.uk',          'Admin',        'rb-a','🛡️','#FEF3C7'],
+            ['System Admin',   'admin@healthsphere.info',          'Admin',        'rb-a','🛡️','#FEF3C7'],
             ['W. Jayson',      'w.jayson@dhsc.gov.uk',               'Gov. Analyst', 'rb-g','🏛️','#EDE9FE'],
           ];
           foreach ($demos as [$name, $email, $role, $cls, $icon, $bg]):

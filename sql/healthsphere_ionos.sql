@@ -318,7 +318,7 @@ CREATE TABLE IF NOT EXISTS documents (
 
 -- Admin user (password: Admin@123)
 INSERT INTO users (nhs_id, first_name, last_name, email, password, role, phone, date_of_birth, gender, city, is_active) VALUES
-('ADMIN001', 'System', 'Admin', 'admin@healthsphere.nhs.uk', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', '07700000000', '1985-01-01', 'male', 'London', 1);
+('ADMIN001', 'System', 'Admin', 'admin@healthsphere.info', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', '07700000000', '1985-01-01', 'male', 'London', 1);
 
 -- Patient: Emma Watson (password: Patient@123)
 INSERT INTO users (nhs_id, first_name, last_name, email, password, role, phone, date_of_birth, gender, blood_type, address, city, postcode, is_active) VALUES
