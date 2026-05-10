@@ -91,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             // ── Send emails (non-blocking, ignore failures) ───────
-            @require_once __DIR__ . '/includes/mailer.php';
+            @include_once __DIR__ . '/includes/mailer.php';
             if ($role === 'patient') {
                 @mailPatientWelcome($email, "$first $last", $nhsId);
                 $success = "patient_ok|{$nhsId}|{$first}";

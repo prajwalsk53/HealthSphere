@@ -1,5 +1,15 @@
 <?php
-require_once __DIR__ . '/../config/mail.php';
+@include_once __DIR__ . '/../config/mail.php';
+
+// Fallback constants if mail.php is missing or incomplete
+if (!defined('MAIL_HOST'))      define('MAIL_HOST',      '');
+if (!defined('MAIL_PORT'))      define('MAIL_PORT',      465);
+if (!defined('MAIL_USER'))      define('MAIL_USER',      '');
+if (!defined('MAIL_PASS'))      define('MAIL_PASS',      '');
+if (!defined('MAIL_FROM'))      define('MAIL_FROM',      '');
+if (!defined('MAIL_FROM_NAME')) define('MAIL_FROM_NAME', 'HealthSphere');
+if (!defined('MAIL_ADMIN'))     define('MAIL_ADMIN',     '');
+if (!defined('APP_URL'))        define('APP_URL',        defined('BASE_URL') ? BASE_URL : '');
 
 // ══════════════════════════════════════════════════════════════════
 //  HealthSphere — Email Service
