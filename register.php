@@ -35,6 +35,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($check->fetch()) {
             $error = 'This email address is already registered.';
         } else {
+            try {
+            $pdo->beginTransaction();
+
             $prefix  = ['patient'=>'PT','doctor'=>'DR','government'=>'GV'][$role] ?? 'US';
             $nhsId   = strtoupper($prefix) . strtoupper(substr($first,0,2)) . rand(100000,999999);
             $hash    = password_hash($password, PASSWORD_DEFAULT);
@@ -65,11 +68,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $exp   = (int)($_POST['experience_years'] ?? 0);
                 $fee   = (float)($_POST['consultation_fee'] ?? 0);
                 $bio   = trim($_POST['bio'] ?? '');
+
+                // Check duplicate HCPC before inserting
+                $hcpcCheck = $pdo->prepare("SELECT id FROM doctors WHERE hcpc_number=?");
+                $hcpcCheck->execute([$hcpc]);
+                if ($hcpcCheck->fetch()) {
+                    $pdo->rollBack();
+                    $error = 'This HCPC number is already registered. Please check and try again.';
+                    goto end_registration;
+                }
+
                 $pdo->prepare("
                     INSERT INTO doctors
                     (user_id,hcpc_number,specialization,hospital_name,hospital_address,experience_years,consultation_fee,bio,is_verified)
                     VALUES (?,?,?,?,?,?,?,?,0)
                 ")->execute([$newUserId,$hcpc,$spec,$hosp,$hospAddr,$exp,$fee,$bio]);
+            }
+
+            $pdo->commit();
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                $error = 'Registration failed: ' . $e->getMessage();
+                goto end_registration;
             }
 
             // ── Notify all admins ──────────────────────────────────
@@ -104,6 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $success = "pending|{$nhsId}|{$first}|{$role}";
             }
             $step = 3;
+            end_registration:
         }
     }
     $selectedRole = $role;
