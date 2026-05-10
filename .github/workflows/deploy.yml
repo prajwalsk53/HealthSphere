@@ -22,11 +22,8 @@ jobs:
           SFTP_USER: ${{ secrets.SFTP_USER }}
           SFTP_PASS: ${{ secrets.SFTP_PASSWORD }}
         run: |
-          cat > ~/.netrc << EOF
-          machine access-5020406432.webspace-host.com
-          login $SFTP_USER
-          password $SFTP_PASS
-          EOF
+          printf 'machine access-5020406432.webspace-host.com\nlogin %s\npassword %s\n' \
+            "$SFTP_USER" "$SFTP_PASS" > ~/.netrc
           chmod 600 ~/.netrc
 
           lftp sftp://access-5020406432.webspace-host.com:22 -e "
