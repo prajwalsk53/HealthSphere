@@ -26,11 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $confirm  = $_POST['confirm']         ?? '';
 
     // TODO: re-enable reCAPTCHA when ready
-    // if (!verifyCaptcha()) {
-    //     $error = 'Please complete the reCAPTCHA verification.';
-    // }
-    // Validate fields
-    elseif (!$first || !$last || !$email || !$password)
+    if (!$first || !$last || !$email || !$password)
         $error = 'Please fill in all required fields.';
     elseif ($password !== $confirm)
         $error = 'Passwords do not match.';
