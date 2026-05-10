@@ -554,8 +554,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;overflow:hidden;}
         </div>
       </div> -->
 
-      <button type="submit" class="submit-btn" id="regSubmitBtn" disabled
-        style="opacity:.5;cursor:not-allowed;">
+      <button type="submit" class="submit-btn" id="regSubmitBtn">
         <i class="fas fa-<?= $selectedRole==='patient'?'user-plus':($selectedRole==='doctor'?'user-md':'landmark') ?>"></i>
         <?= $selectedRole==='patient' ? 'Create Patient Account' : ($selectedRole==='doctor' ? 'Submit Doctor Application' : 'Submit Analyst Application') ?>
       </button>
