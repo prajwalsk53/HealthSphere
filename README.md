@@ -86,11 +86,11 @@ The platform features AI-powered tools (meal planning, health insights, ingredie
 | Charts | Chart.js |
 | Icons | Font Awesome 6 |
 | Fonts | Google Fonts (Inter) |
-| AI | Anthropic Claude API (claude-haiku-4-5) |
+| AI | Google Gemini API (gemini-2.5-flash) |
 | Email | SMTP via PHPMailer / cURL |
 | Maps | Leaflet.js |
 | Mobile | Flutter (Dart) |
-| Local Server | XAMPP (Apache + MySQL) |
+| Hosting | IONOS (Apache + MySQL) |
 
 ---
 
@@ -174,15 +174,15 @@ All demo accounts use the password: **`password`**
 
 ## AI Features
 
-The platform uses the **Anthropic Claude API** for:
+The platform uses the **Google Gemini API** for:
 - **AI Meal Assistant** — Personalised recipe suggestions and cooking instructions based on your health profile
 - **Health Insights** — AI-generated summaries of your health trends
-- **AI Assistant** — General health Q&A chatbot
+- **AI Assistant** — General health Q&A chatbot with full patient context
 - **Safe Appetite Scanner** — Smart ingredient analysis (also has a full local fallback engine that works without API credits)
 
-To enable AI features, add your Anthropic API key to `config/ai.php`. Get a free key at [console.anthropic.com](https://console.anthropic.com).
+To enable AI features, add your Gemini API key to `config/ai.php`. Get a free key at [aistudio.google.com](https://aistudio.google.com).
 
-> The Safe Appetite scanner works fully without an API key using the built-in rule-based engine.
+> The AI Assistant and Safe Appetite scanner work fully without an API key using the built-in rule-based engine.
 
 ---
 
