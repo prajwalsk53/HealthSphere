@@ -45,6 +45,15 @@ $notifCount = getUnreadCount($pdo, $uid);
   </div>
   <div class="hs-content">
     <?php if ($success): ?><div style="background:#DCFCE7;border:1px solid #BBF7D0;border-radius:8px;padding:12px 16px;margin-bottom:16px;color:#166534;font-size:13px;font-weight:600;"><i class="fas fa-check-circle"></i> <?= $success ?></div><?php endif; ?>
+
+    <!-- Tabs -->
+    <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--hs-border);">
+      <button id="tab-local" onclick="switchTab('local')" style="padding:10px 20px;font-size:13px;font-weight:700;border:none;background:none;cursor:pointer;color:var(--hs-blue);border-bottom:2px solid var(--hs-blue);margin-bottom:-2px;"><i class="fas fa-database"></i> Local Database <span style="background:var(--hs-blue);color:#fff;padding:1px 7px;border-radius:10px;font-size:11px;margin-left:4px;"><?= count($foods) ?></span></button>
+      <button id="tab-spoon" onclick="switchTab('spoon')" style="padding:10px 20px;font-size:13px;font-weight:700;border:none;background:none;cursor:pointer;color:var(--hs-muted);border-bottom:2px solid transparent;margin-bottom:-2px;"><i class="fas fa-search"></i> Search Spoonacular <span style="background:#16A34A;color:#fff;padding:1px 7px;border-radius:10px;font-size:11px;margin-left:4px;">Live</span></button>
+    </div>
+
+    <!-- LOCAL DB TAB -->
+    <div id="pane-local">
     <div class="hs-card">
       <div class="hs-card-header"><span class="card-title"><i class="fas fa-table"></i> Food Diets Data Table</span></div>
       <div class="hs-card-body p-0">
@@ -82,6 +91,31 @@ $notifCount = getUnreadCount($pdo, $uid);
         </table>
       </div>
     </div>
+    </div><!-- /pane-local -->
+
+    <!-- SPOONACULAR TAB -->
+    <div id="pane-spoon" style="display:none;">
+      <div class="hs-card" style="margin-bottom:16px;">
+        <div class="hs-card-body">
+          <div style="display:flex;gap:10px;align-items:center;">
+            <div class="input-icon-wrap" style="flex:1;max-width:480px;"><i class="fas fa-search"></i><input type="text" id="spoonQ" class="form-control" placeholder="Search Spoonacular: e.g. chicken, broccoli, quinoa..."></div>
+            <button onclick="searchSpoonacular()" class="btn-hs btn-primary-hs"><i class="fas fa-search"></i> Search</button>
+            <span style="font-size:12px;color:var(--hs-muted);"><i class="fas fa-database" style="color:#16A34A;"></i> 300,000+ foods</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="spoonLoading" style="display:none;text-align:center;padding:40px;color:var(--hs-muted);"><i class="fas fa-spinner fa-spin fa-2x"></i><br><br>Searching Spoonacular...</div>
+      <div id="spoonError" style="display:none;background:#FEE2E2;border:1px solid #FECACA;border-radius:8px;padding:14px 18px;color:#991B1B;font-size:13px;margin-bottom:16px;"></div>
+
+      <div id="spoonGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;"></div>
+
+      <div id="spoonEmpty" style="display:none;text-align:center;padding:60px 20px;color:var(--hs-muted);">
+        <i class="fas fa-search fa-3x" style="margin-bottom:16px;opacity:.3;"></i><br>
+        Search for any ingredient to see nutritional data from Spoonacular's database.
+      </div>
+    </div><!-- /pane-spoon -->
+
   </div>
 </div>
 
@@ -116,5 +150,107 @@ $notifCount = getUnreadCount($pdo, $uid);
   </div>
 </div>
 <script src="../assets/js/main.js"></script>
+<script>
+// ── Tab switching ────────────────────────────────────────────────
+function switchTab(tab) {
+  document.getElementById('pane-local').style.display  = tab === 'local' ? '' : 'none';
+  document.getElementById('pane-spoon').style.display  = tab === 'spoon' ? '' : 'none';
+  document.getElementById('tab-local').style.color      = tab === 'local' ? 'var(--hs-blue)' : 'var(--hs-muted)';
+  document.getElementById('tab-spoon').style.color      = tab === 'spoon' ? 'var(--hs-blue)' : 'var(--hs-muted)';
+  document.getElementById('tab-local').style.borderBottomColor = tab === 'local' ? 'var(--hs-blue)' : 'transparent';
+  document.getElementById('tab-spoon').style.borderBottomColor = tab === 'spoon' ? 'var(--hs-blue)' : 'transparent';
+  if (tab === 'spoon') document.getElementById('spoonEmpty').style.display = 'block';
+}
+
+// ── Spoonacular search ───────────────────────────────────────────
+document.getElementById('spoonQ').addEventListener('keydown', e => { if (e.key === 'Enter') searchSpoonacular(); });
+
+async function searchSpoonacular() {
+  const q = document.getElementById('spoonQ').value.trim();
+  if (!q) return;
+
+  document.getElementById('spoonGrid').innerHTML = '';
+  document.getElementById('spoonEmpty').style.display  = 'none';
+  document.getElementById('spoonError').style.display  = 'none';
+  document.getElementById('spoonLoading').style.display = 'block';
+
+  try {
+    const res  = await fetch(`../api/spoonacular-search.php?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    document.getElementById('spoonLoading').style.display = 'none';
+
+    if (!Array.isArray(data) || data.length === 0) {
+      document.getElementById('spoonEmpty').style.display = 'block';
+      return;
+    }
+
+    const grid = document.getElementById('spoonGrid');
+    data.forEach(item => {
+      const card = document.createElement('div');
+      card.style.cssText = 'background:#fff;border:1px solid var(--hs-border);border-radius:12px;overflow:hidden;transition:.2s;';
+      card.innerHTML = `
+        <div style="background:var(--hs-off-white);display:flex;align-items:center;justify-content:center;height:120px;">
+          <img src="${item.image}" onerror="this.src='https://spoonacular.com/cdn/ingredients_100x100/food.jpg'" style="max-height:100px;max-width:120px;object-fit:contain;">
+        </div>
+        <div style="padding:14px;">
+          <div style="font-weight:700;font-size:14px;color:var(--hs-navy);margin-bottom:4px;text-transform:capitalize;">${item.food_name}</div>
+          <div style="font-size:11px;color:var(--hs-muted);margin-bottom:10px;">${item.category}</div>
+          <div id="macro-${item.spoonacular_id}" style="font-size:11px;color:var(--hs-muted);">
+            <i class="fas fa-spinner fa-spin"></i> Loading nutrition...
+          </div>
+          <button onclick="importFood(${item.spoonacular_id}, '${item.food_name.replace(/'/g,"\\'")}', '${item.category}')"
+            style="margin-top:10px;width:100%;background:var(--hs-blue);color:#fff;border:none;border-radius:7px;padding:7px;font-size:12px;font-weight:700;cursor:pointer;">
+            <i class="fas fa-download"></i> Import to Database
+          </button>
+        </div>`;
+      grid.appendChild(card);
+
+      // Load nutrition detail for each result
+      loadNutrition(item.spoonacular_id);
+    });
+
+  } catch (err) {
+    document.getElementById('spoonLoading').style.display = 'none';
+    document.getElementById('spoonError').style.display   = 'block';
+    document.getElementById('spoonError').textContent     = 'Error contacting Spoonacular: ' + err.message;
+  }
+}
+
+async function loadNutrition(id) {
+  try {
+    const res  = await fetch(`../api/spoonacular-info.php?id=${id}`);
+    const data = await res.json();
+    const el   = document.getElementById(`macro-${id}`);
+    if (!el || data.error) return;
+    el.innerHTML = `
+      <span style="margin-right:8px;">🔥 <b>${data.calories_per_100g||0}</b> kcal</span>
+      <span style="margin-right:8px;">🥩 <b>${data.protein_g||0}g</b> protein</span>
+      <span>🫙 <b>${data.carbs_g||0}g</b> carbs</span>`;
+  } catch(e) {}
+}
+
+// ── Import to local DB ───────────────────────────────────────────
+async function importFood(id, name, category) {
+  const res  = await fetch(`../api/spoonacular-info.php?id=${id}`);
+  const data = await res.json();
+  if (data.error) { alert('Could not load nutritional data.'); return; }
+
+  // Pre-fill the Add Food modal
+  const m = document.getElementById('addFoodModal');
+  m.querySelector('[name=food_name]').value     = name;
+  m.querySelector('[name=category]').value      = category;
+  m.querySelector('[name=calories]').value      = data.calories_per_100g || 0;
+  m.querySelector('[name=protein]').value       = data.protein_g  || 0;
+  m.querySelector('[name=sugar]').value         = data.sugar_g    || 0;
+  m.querySelector('[name=fats]').value          = data.fats_g     || 0;
+  m.querySelector('[name=fiber]').value         = data.fiber_g    || 0;
+  m.querySelector('[name=sodium]').value        = data.sodium_mg  || 0;
+  m.querySelector('[name=vitamins]').value      = '';
+  m.querySelector('[name=portion]').value       = '100g serving';
+  m.querySelector('[name=health_rating]').value = 'good';
+  m.style.display = 'flex';
+  switchTab('local');
+}
+</script>
 </body>
 </html>
