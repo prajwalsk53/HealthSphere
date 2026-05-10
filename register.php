@@ -25,10 +25,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password']        ?? '';
     $confirm  = $_POST['confirm']         ?? '';
 
-    // Validate reCAPTCHA first
-    if (!verifyCaptcha()) {
-        $error = 'Please complete the reCAPTCHA verification.';
-    }
+    // TODO: re-enable reCAPTCHA when ready
+    // if (!verifyCaptcha()) {
+    //     $error = 'Please complete the reCAPTCHA verification.';
+    // }
     // Validate fields
     elseif (!$first || !$last || !$email || !$password)
         $error = 'Please fill in all required fields.';
@@ -548,15 +548,15 @@ html,body{height:100%;font-family:'Inter',sans-serif;overflow:hidden;}
         </label>
       </div>
 
-      <!-- reCAPTCHA -->
-      <div style="display:flex;justify-content:center;margin:16px 0 4px;">
+      <!-- reCAPTCHA disabled temporarily -->
+      <!-- <div style="display:flex;justify-content:center;margin:16px 0 4px;">
         <div class="g-recaptcha"
              data-sitekey="<?= RECAPTCHA_SITE_KEY ?>"
              data-theme="light"
              data-callback="onRegCaptcha"
              data-expired-callback="onRegExpired">
         </div>
-      </div>
+      </div> -->
 
       <button type="submit" class="submit-btn" id="regSubmitBtn" disabled
         style="opacity:.5;cursor:not-allowed;">
@@ -626,6 +626,6 @@ function onRegExpired() {
   if (btn) { btn.disabled=true; btn.style.opacity='.5'; btn.style.cursor='not-allowed'; }
 }
 </script>
-<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+<!-- <script src="https://www.google.com/recaptcha/api.js" async defer></script> -->
 </body>
 </html>
