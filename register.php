@@ -4,6 +4,13 @@ if (isLoggedIn()) redirectByRole($_SESSION['user_role']);
 
 $error = $success = '';
 $step  = 1;
+
+// Read PRG success from session
+if (isset($_GET['done'], $_SESSION['reg_success'])) {
+    $success = $_SESSION['reg_success'];
+    unset($_SESSION['reg_success']);
+    $step = 3;
+}
 $selectedRole = $_GET['role'] ?? 'patient';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -114,16 +121,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             @include_once __DIR__ . '/includes/mailer.php';
             if ($role === 'patient') {
                 @mailPatientWelcome($email, "$first $last", $nhsId);
-                $success = "patient_ok|{$nhsId}|{$first}";
+                $successData = "patient_ok|{$nhsId}|{$first}";
             } else {
                 @mailApplicationReceived($email, "$first $last", $role, $nhsId);
                 $extras = $role==='doctor'
                     ? ['HCPC'=>trim($_POST['hcpc_number']??'—'),'Specialization'=>trim($_POST['specialization']??'—'),'Hospital'=>trim($_POST['hospital_name']??'—')]
                     : ['Department'=>trim($_POST['gov_department']??'—'),'Staff ID'=>trim($_POST['gov_staff_id']??'—'),'Job Title'=>trim($_POST['gov_job_title']??'—')];
                 @mailAdminNewApplication("$first $last", $email, $role, $nhsId, $extras);
-                $success = "pending|{$nhsId}|{$first}|{$role}";
+                $successData = "pending|{$nhsId}|{$first}|{$role}";
             }
-            $step = 3;
+            // PRG: redirect to avoid form resubmission on back/reload
+            $_SESSION['reg_success'] = $successData;
+            header('Location: ' . BASE_PATH . '/register.php?done=1');
+            exit;
             end_registration:
         }
     }
