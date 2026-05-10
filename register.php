@@ -101,13 +101,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 foreach ($admins as $admin) {
                     $pdo->prepare("
                         INSERT INTO notifications
-                        (user_id,title,message,notification_type,related_user_id)
-                        VALUES (?,?,?,'system',?)
+                        (user_id,title,message,notification_type)
+                        VALUES (?,?,?,'system')
                     ")->execute([
                         $admin['id'],
                         "New {$roleLabel} Registration Pending Approval",
                         "{$first} {$last} has registered as a {$roleLabel} and is awaiting account approval.",
-                        $newUserId,
                     ]);
                 }
             }
