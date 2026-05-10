@@ -127,7 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             // PRG: redirect to avoid form resubmission on back/reload
             $_SESSION['reg_success'] = $successData;
-            header('Location: ' . BASE_PATH . '/register.php?done=1');
+            header('Location: ' . BASE_URL . '/register.php?done=1');
             exit;
 
             } // end if (!$error)
