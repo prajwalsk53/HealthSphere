@@ -17,19 +17,18 @@ jobs:
       - name: Install lftp
         run: sudo apt-get install -y lftp
 
-      - name: Deploy via SFTP
-        env:
-          SFTP_USER: ${{ secrets.SFTP_USER }}
-          SFTP_PASS: ${{ secrets.SFTP_PASSWORD }}
+      - name: Setup SSH key
         run: |
-          printf 'machine access-5020406432.webspace-host.com\nlogin %s\npassword %s\n' \
-            "$SFTP_USER" "$SFTP_PASS" > ~/.netrc
-          chmod 600 ~/.netrc
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SFTP_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p 22 access-5020406432.webspace-host.com >> ~/.ssh/known_hosts
 
-          lftp sftp://access-5020406432.webspace-host.com:22 -e "
-            set sftp:auto-confirm yes;
-            set net:timeout 30;
-            set net:max-retries 3;
+      - name: Deploy via SFTP
+        run: |
+          lftp -e "
+            set sftp:connect-program 'ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no';
+            open sftp://${{ secrets.SFTP_USER }}@access-5020406432.webspace-host.com:22;
             mirror --reverse --delete --verbose \
               --exclude='^\.git' \
               --exclude='config/mail\.php' \
