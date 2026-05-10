@@ -18,19 +18,27 @@ jobs:
         run: sudo apt-get install -y lftp
 
       - name: Deploy via SFTP
+        env:
+          SFTP_USER: ${{ secrets.SFTP_USER }}
+          SFTP_PASS: ${{ secrets.SFTP_PASSWORD }}
         run: |
-          lftp -u "${{ secrets.SFTP_USER }},${{ secrets.SFTP_PASSWORD }}" \
-            -e "
-              set sftp:auto-confirm yes;
-              set net:timeout 30;
-              set net:max-retries 3;
-              open sftp://access-5020406432.webspace-host.com:22;
-              mirror --reverse --delete --verbose \
-                --exclude='^\.git' \
-                --exclude='config/mail\.php' \
-                --exclude='^logs/' \
-                --exclude='^sql/' \
-                --exclude='.*\.sql$' \
-                ./ /HealthSphere/;
-              quit
-            "
+          cat > ~/.netrc << EOF
+          machine access-5020406432.webspace-host.com
+          login $SFTP_USER
+          password $SFTP_PASS
+          EOF
+          chmod 600 ~/.netrc
+
+          lftp sftp://access-5020406432.webspace-host.com:22 -e "
+            set sftp:auto-confirm yes;
+            set net:timeout 30;
+            set net:max-retries 3;
+            mirror --reverse --delete --verbose \
+              --exclude='^\.git' \
+              --exclude='config/mail\.php' \
+              --exclude='^logs/' \
+              --exclude='^sql/' \
+              --exclude='.*\.sql$' \
+              ./ /HealthSphere/;
+            quit
+          "
