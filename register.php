@@ -43,61 +43,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'This email address is already registered.';
         } else {
             try {
-            $pdo->beginTransaction();
+                $pdo->beginTransaction();
 
-            $prefix  = ['patient'=>'PT','doctor'=>'DR','government'=>'GV'][$role] ?? 'US';
-            $nhsId   = strtoupper($prefix) . strtoupper(substr($first,0,2)) . rand(100000,999999);
-            $hash    = password_hash($password, PASSWORD_DEFAULT);
+                $prefix  = ['patient'=>'PT','doctor'=>'DR','government'=>'GV'][$role] ?? 'US';
+                $nhsId   = strtoupper($prefix) . strtoupper(substr($first,0,2)) . rand(100000,999999);
+                $hash    = password_hash($password, PASSWORD_DEFAULT);
 
-            // Patients approved immediately; doctors & gov require admin approval
-            $isActive      = ($role === 'patient') ? 1 : 0;
-            $approvalStatus= ($role === 'patient') ? 'approved' : 'pending';
+                $isActive       = ($role === 'patient') ? 1 : 0;
+                $approvalStatus = ($role === 'patient') ? 'approved' : 'pending';
 
-            $stmt = $pdo->prepare("
-                INSERT INTO users
-                (nhs_id, first_name, last_name, email, password, role, phone,
-                 date_of_birth, gender, blood_type, is_active, approval_status, applied_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,NOW())
-            ");
-            $stmt->execute([
-                $nhsId,$first,$last,$email,$hash,$role,$phone,
-                $dob?:null,$gender?:null,$blood?:null,
-                $isActive,$approvalStatus,
-            ]);
-            $newUserId = (int)$pdo->lastInsertId();
+                $stmt = $pdo->prepare("
+                    INSERT INTO users
+                    (nhs_id, first_name, last_name, email, password, role, phone,
+                     date_of_birth, gender, blood_type, is_active, approval_status, applied_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,NOW())
+                ");
+                $stmt->execute([
+                    $nhsId,$first,$last,$email,$hash,$role,$phone,
+                    $dob?:null,$gender?:null,$blood?:null,
+                    $isActive,$approvalStatus,
+                ]);
+                $newUserId = (int)$pdo->lastInsertId();
 
-            // ── Doctor extra profile ───────────────────────────────
-            if ($role === 'doctor') {
-                $hcpc  = trim($_POST['hcpc_number'] ?? '');
-                $spec  = trim($_POST['specialization'] ?? '');
-                $hosp  = trim($_POST['hospital_name'] ?? '');
-                $hospAddr = trim($_POST['hospital_address'] ?? '');
-                $exp   = (int)($_POST['experience_years'] ?? 0);
-                $fee   = (float)($_POST['consultation_fee'] ?? 0);
-                $bio   = trim($_POST['bio'] ?? '');
+                // ── Doctor extra profile ───────────────────────────
+                if ($role === 'doctor') {
+                    $hcpc     = trim($_POST['hcpc_number'] ?? '');
+                    $spec     = trim($_POST['specialization'] ?? '');
+                    $hosp     = trim($_POST['hospital_name'] ?? '');
+                    $hospAddr = trim($_POST['hospital_address'] ?? '');
+                    $exp      = (int)($_POST['experience_years'] ?? 0);
+                    $fee      = (float)($_POST['consultation_fee'] ?? 0);
+                    $bio      = trim($_POST['bio'] ?? '');
 
-                // Check duplicate HCPC before inserting
-                $hcpcCheck = $pdo->prepare("SELECT id FROM doctors WHERE hcpc_number=?");
-                $hcpcCheck->execute([$hcpc]);
-                if ($hcpcCheck->fetch()) {
-                    $pdo->rollBack();
-                    $error = 'This HCPC number is already registered. Please check and try again.';
-                    goto end_registration;
+                    $hcpcCheck = $pdo->prepare("SELECT id FROM doctors WHERE hcpc_number=?");
+                    $hcpcCheck->execute([$hcpc]);
+                    if ($hcpcCheck->fetch()) {
+                        throw new Exception('This HCPC number is already registered. Please check and try again.');
+                    }
+
+                    $pdo->prepare("
+                        INSERT INTO doctors
+                        (user_id,hcpc_number,specialization,hospital_name,hospital_address,experience_years,consultation_fee,bio,is_verified)
+                        VALUES (?,?,?,?,?,?,?,?,0)
+                    ")->execute([$newUserId,$hcpc,$spec,$hosp,$hospAddr,$exp,$fee,$bio]);
                 }
 
-                $pdo->prepare("
-                    INSERT INTO doctors
-                    (user_id,hcpc_number,specialization,hospital_name,hospital_address,experience_years,consultation_fee,bio,is_verified)
-                    VALUES (?,?,?,?,?,?,?,?,0)
-                ")->execute([$newUserId,$hcpc,$spec,$hosp,$hospAddr,$exp,$fee,$bio]);
+                $pdo->commit();
+
+            } catch (Exception $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                $error = $e->getMessage();
             }
 
-            $pdo->commit();
-            } catch (Exception $e) {
-                $pdo->rollBack();
-                $error = 'Registration failed: ' . $e->getMessage();
-                goto end_registration;
-            }
+            // ── Only proceed if no error ───────────────────────────
+            if (!$error) {
 
             // ── Notify all admins ──────────────────────────────────
             if ($role !== 'patient') {
@@ -134,7 +133,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['reg_success'] = $successData;
             header('Location: ' . BASE_PATH . '/register.php?done=1');
             exit;
-            end_registration:
+
+            } // end if (!$error)
         }
     }
     $selectedRole = $role;
