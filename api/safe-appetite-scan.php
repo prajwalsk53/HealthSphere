@@ -8,9 +8,52 @@ requireRole('patient');
 
 header('Content-Type: application/json');
 
+$uid = getCurrentUser()['id'];
+
+// ── Auto-create missing tables ────────────────────────────────────────
+$pdo->exec("CREATE TABLE IF NOT EXISTS diet_preferences (
+    id         INT PRIMARY KEY AUTO_INCREMENT,
+    patient_id INT NOT NULL,
+    preference VARCHAR(100) NOT NULL,
+    is_active  TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_patient_pref (patient_id, preference),
+    FOREIGN KEY (patient_id) REFERENCES users(id) ON DELETE CASCADE
+)");
+
+$pdo->exec("CREATE TABLE IF NOT EXISTS food_intolerances (
+    id          INT PRIMARY KEY AUTO_INCREMENT,
+    patient_id  INT NOT NULL,
+    intolerance VARCHAR(100) NOT NULL,
+    severity    ENUM('mild','moderate','severe') DEFAULT 'mild',
+    is_active   TINYINT(1) DEFAULT 1,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_patient_intol (patient_id, intolerance),
+    FOREIGN KEY (patient_id) REFERENCES users(id) ON DELETE CASCADE
+)");
+
+$pdo->exec("CREATE TABLE IF NOT EXISTS ingredient_dislikes (
+    id         INT PRIMARY KEY AUTO_INCREMENT,
+    patient_id INT NOT NULL,
+    ingredient VARCHAR(150) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (patient_id) REFERENCES users(id) ON DELETE CASCADE
+)");
+
+$pdo->exec("CREATE TABLE IF NOT EXISTS ingredient_scans (
+    id              INT PRIMARY KEY AUTO_INCREMENT,
+    patient_id      INT NOT NULL,
+    product_name    VARCHAR(200),
+    ingredients_raw TEXT,
+    scan_result     ENUM('safe','warning','danger') DEFAULT 'safe',
+    alerts_json     TEXT,
+    ai_summary      TEXT,
+    scanned_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (patient_id) REFERENCES users(id) ON DELETE CASCADE
+)");
+
 $body = json_decode(file_get_contents('php://input'), true);
 $action = $body['action'] ?? 'scan';
-$uid = getCurrentUser()['id'];
 
 // ── Save Preferences ─────────────────────────────────────────────────
 if ($action === 'save_preferences') {
