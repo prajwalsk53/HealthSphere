@@ -25,7 +25,7 @@ if (session_status() === PHP_SESSION_NONE) {
         'path'     => '/',
         'secure'   => !$_isLocal,
         'httponly' => true,
-        'samesite' => 'Strict',
+        'samesite' => 'Lax',
     ]);
     session_start();
 }
