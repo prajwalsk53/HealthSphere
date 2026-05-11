@@ -23,7 +23,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_set_cookie_params([
         'lifetime' => SESSION_LIFETIME,
         'path'     => '/',
-        'secure'   => false,
+        'secure'   => !$_isLocal,
         'httponly' => true,
         'samesite' => 'Strict',
     ]);
@@ -32,3 +32,4 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/sentry.php';
