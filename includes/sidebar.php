@@ -18,6 +18,7 @@ $navByRole = [
         ['icon' => 'fa-utensils',        'label' => 'Diet Tracker',      'href' => "$base/patient/diet-tracker.php"],
         ['icon' => 'fa-shield-heart',    'label' => 'Safe Appetite',     'href' => "$base/patient/safe-appetite.php"],
         ['icon' => 'fa-heartbeat',       'label' => 'Health Insights',   'href' => "$base/patient/health-insights.php"],
+        ['icon' => 'fa-watch',           'label' => 'Wearable Sync',     'href' => "$base/patient/wearable.php"],
         ['icon' => 'fa-chart-bar',       'label' => 'Health Analysis',   'href' => "$base/patient/health-analysis.php"],
         ['icon' => 'fa-map-marked-alt',  'label' => 'Health Map',        'href' => "$base/patient/map.php"],
         ['icon' => 'fa-robot',           'label' => 'AI Assistant',      'href' => "$base/patient/ai-assistant.php"],
