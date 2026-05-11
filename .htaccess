@@ -30,14 +30,40 @@ DirectoryIndex index.php
 # ── Browser caching for assets ───────────────────────────────────────
 <IfModule mod_expires.c>
     ExpiresActive On
-    ExpiresByType text/css "access plus 1 week"
-    ExpiresByType application/javascript "access plus 1 week"
-    ExpiresByType image/png "access plus 1 month"
-    ExpiresByType image/jpeg "access plus 1 month"
-    ExpiresByType image/svg+xml "access plus 1 month"
+    ExpiresByType text/css                "access plus 1 month"
+    ExpiresByType application/javascript  "access plus 1 month"
+    ExpiresByType image/png               "access plus 6 months"
+    ExpiresByType image/jpeg              "access plus 6 months"
+    ExpiresByType image/gif               "access plus 6 months"
+    ExpiresByType image/webp              "access plus 6 months"
+    ExpiresByType image/svg+xml           "access plus 6 months"
+    ExpiresByType image/x-icon            "access plus 1 year"
+    ExpiresByType font/woff2              "access plus 1 year"
+    ExpiresByType font/woff               "access plus 1 year"
+    ExpiresByType application/font-woff2  "access plus 1 year"
+    ExpiresByType text/html               "access plus 0 seconds"
 </IfModule>
 
-# ── Force HTTPS (uncomment on live server) ───────────────────────────
-# RewriteEngine On
-# RewriteCond %{HTTPS} off
-# RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+# ── Cache-Control headers ─────────────────────────────────────────────
+<IfModule mod_headers.c>
+    <FilesMatch "\.(css|js)$">
+        Header set Cache-Control "public, max-age=2592000, immutable"
+    </FilesMatch>
+    <FilesMatch "\.(png|jpg|jpeg|gif|webp|svg|ico|woff|woff2)$">
+        Header set Cache-Control "public, max-age=15552000"
+    </FilesMatch>
+    <FilesMatch "\.(php|html)$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+    </FilesMatch>
+</IfModule>
+
+# ── Force HTTPS ──────────────────────────────────────────────────────
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+# ── HSTS (tell browsers to always use HTTPS for 1 year) ──────────────
+<IfModule mod_headers.c>
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+</IfModule>
