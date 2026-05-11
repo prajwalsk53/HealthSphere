@@ -222,11 +222,28 @@ html, body { margin:0; padding:0; height:100%; overflow:hidden; }
 
     <!-- LEFT SIDEBAR -->
     <div class="map-sidebar">
-      <!-- Search -->
+      <!-- Live NHS Postcode Search -->
+      <div style="padding:12px 14px;background:#EFF6FF;border-bottom:2px solid #005EB8;">
+        <div style="font-size:11px;font-weight:700;color:#005EB8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">
+          <img src="https://www.nhs.uk/nhschoicesContent/imagecontent/icons/apple-touch-icon.png" style="height:12px;vertical-align:middle;border-radius:2px;"> Live NHS Facility Search
+        </div>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="postcodeInput" placeholder="Enter postcode e.g. LE1 7RH"
+            class="form-control" style="font-size:13px;flex:1;"
+            onkeydown="if(event.key==='Enter')searchByPostcode()">
+          <button onclick="searchByPostcode()" id="postcodeBtn"
+            style="background:#005EB8;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">
+            Search
+          </button>
+        </div>
+        <div id="postcodeStatus" style="font-size:11px;color:#1d4ed8;margin-top:5px;"></div>
+      </div>
+
+      <!-- Local Search -->
       <div class="sidebar-search">
         <div class="input-icon-wrap">
           <i class="fas fa-search"></i>
-          <input type="text" id="facilitySearch" placeholder="Search hospitals, pharmacies..."
+          <input type="text" id="facilitySearch" placeholder="Filter results..."
             class="form-control" oninput="filterFacilities()">
         </div>
         <div style="font-size:11px;color:var(--hs-muted);margin-top:6px;">
@@ -597,6 +614,84 @@ function locateMe() {
 function flyToEmergency() {
   const ae = FACILITIES.find(f => f.emergency);
   if (ae) { setTimeout(()=>focusFacility(ae.id), 100); }
+}
+
+// ── Live NHS Postcode Search ────────────────────────────────────────
+let liveMarkers = [];
+
+function searchByPostcode() {
+  const postcode = document.getElementById('postcodeInput').value.trim();
+  if (!postcode) { showToast('Please enter a postcode', 'error'); return; }
+
+  const btn    = document.getElementById('postcodeBtn');
+  const status = document.getElementById('postcodeStatus');
+  btn.textContent = '...';
+  btn.disabled = true;
+  status.textContent = 'Searching NHS facilities...';
+
+  // Clear previous live markers
+  liveMarkers.forEach(m => map.removeLayer(m));
+  liveMarkers = [];
+
+  fetch(`../api/nhs-hospitals.php?postcode=${encodeURIComponent(postcode)}&type=all`)
+    .then(r => r.json())
+    .then(data => {
+      btn.textContent = 'Search';
+      btn.disabled = false;
+
+      if (data.error) {
+        status.textContent = '⚠️ ' + data.error;
+        return;
+      }
+      if (!data.results || !data.results.length) {
+        status.textContent = 'No NHS facilities found nearby.';
+        return;
+      }
+
+      // Fly map to postcode centre
+      map.flyTo([data.center.lat, data.center.lng], 14, { duration: 1.2 });
+
+      // Add your location marker
+      const youMarker = L.circleMarker([data.center.lat, data.center.lng], {
+        radius: 10, color: '#fff', weight: 3,
+        fillColor: '#005EB8', fillOpacity: 1,
+      }).addTo(map).bindPopup(`<strong>📍 ${data.postcode}</strong><br>Your search location`).openPopup();
+      liveMarkers.push(youMarker);
+
+      const typeIcons = { hospital:'🏥', gp:'🩺', pharmacy:'💊', other:'🏢' };
+      const typeColors = { hospital:'#1565C0', gp:'#16A34A', pharmacy:'#0891B2', other:'#6b7280' };
+
+      data.results.forEach(f => {
+        const icon = L.divIcon({
+          className: '',
+          html: `<div style="background:${typeColors[f.type]||'#6b7280'};color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);">${typeIcons[f.type]||'🏢'}</div>`,
+          iconSize: [32, 32], iconAnchor: [16, 16],
+        });
+        const popup = `
+          <div style="min-width:200px;">
+            <strong style="font-size:13px;">${f.name}</strong><br>
+            ${f.nhs ? '<span style="background:#003087;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;">NHS</span> ' : ''}
+            <span style="font-size:11px;color:#6b7280;text-transform:capitalize;">${f.type}</span><br>
+            ${f.address ? `<span style="font-size:11px;">📍 ${f.address}</span><br>` : ''}
+            ${f.phone ? `<span style="font-size:11px;">📞 <a href="tel:${f.phone}">${f.phone}</a></span><br>` : ''}
+            ${f.hours ? `<span style="font-size:11px;">🕐 ${f.hours}</span><br>` : ''}
+            <span style="font-size:11px;color:#005EB8;">📏 ${f.distance} km away</span>
+            ${f.website ? `<br><a href="${f.website}" target="_blank" style="font-size:11px;color:#005EB8;">🔗 Website</a>` : ''}
+          </div>`;
+        const m = L.marker([f.lat, f.lng], { icon })
+          .addTo(map)
+          .bindPopup(popup);
+        liveMarkers.push(m);
+      });
+
+      status.innerHTML = `<span style="color:#16A34A;">✓ Found ${data.results.length} NHS facilities near ${data.postcode}</span>`;
+      showToast(`Found ${data.results.length} NHS facilities near ${data.postcode}`, 'success');
+    })
+    .catch(() => {
+      btn.textContent = 'Search';
+      btn.disabled = false;
+      status.textContent = '⚠️ Search failed. Please try again.';
+    });
 }
 </script>
 </body>

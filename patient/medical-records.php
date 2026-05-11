@@ -90,11 +90,17 @@ $activeTab  = $_GET['tab'] ?? 'records';
         <div class="hs-card-body">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
             <div style="font-size:28px;"><?= $icons[$r['record_type']] ?? '📋' ?></div>
-            <div>
+            <div style="flex:1;">
               <div style="font-weight:700;font-size:14px;color:var(--hs-navy);"><?= e($r['title']) ?></div>
               <div style="font-size:12px;color:var(--hs-muted);"><?= formatDate($r['test_date']) ?></div>
             </div>
-            <div style="margin-left:auto;"><?= getStatusBadge($r['result_status']) ?></div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+              <?= getStatusBadge($r['result_status']) ?>
+              <button onclick="showNHSGuide('<?= e(addslashes($r['title'])) ?>')"
+                style="font-size:10px;padding:3px 8px;border:1px solid #005EB8;color:#005EB8;background:#EBF3FB;border-radius:5px;cursor:pointer;display:flex;align-items:center;gap:4px;font-weight:600;">
+                <img src="https://www.nhs.uk/nhschoicesContent/imagecontent/icons/apple-touch-icon.png" style="width:12px;height:12px;border-radius:2px;"> NHS Guide
+              </button>
+            </div>
           </div>
           <p style="font-size:13px;color:var(--hs-text);line-height:1.6;margin-bottom:10px;"><?= e($r['result']) ?></p>
           <?php if ($r['first_name']): ?>
@@ -156,7 +162,13 @@ $activeTab  = $_GET['tab'] ?? 'records';
                 <div style="font-size:12px;color:var(--hs-muted);text-transform:capitalize;"><?= e($a['allergy_type']) ?></div>
               </div>
             </div>
-            <span class="badge bg-<?= $sc ?>"><?= ucfirst($sev) ?></span>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+              <span class="badge bg-<?= $sc ?>"><?= ucfirst($sev) ?></span>
+              <button onclick="showNHSGuide('<?= e(addslashes($a['allergen'])) ?> allergy')"
+                style="font-size:10px;padding:3px 8px;border:1px solid #005EB8;color:#005EB8;background:#EBF3FB;border-radius:5px;cursor:pointer;display:flex;align-items:center;gap:4px;font-weight:600;">
+                <img src="https://www.nhs.uk/nhschoicesContent/imagecontent/icons/apple-touch-icon.png" style="width:12px;height:12px;border-radius:2px;"> NHS Guide
+              </button>
+            </div>
           </div>
           <p style="font-size:13px;color:var(--hs-muted);margin:8px 0 0;"><?= e($a['symptoms']) ?></p>
           <?php if (!$a['is_active']): ?>
@@ -709,5 +721,94 @@ $activeTab  = $_GET['tab'] ?? 'records';
   </div>
 </div>
 <script src="../assets/js/main.js"></script>
+
+<!-- ═══ NHS GUIDE MODAL ═══ -->
+<div id="nhsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:4000;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:20px;width:100%;max-width:560px;max-height:90vh;overflow:hidden;box-shadow:0 24px 80px rgba(10,31,68,.3);display:flex;flex-direction:column;">
+    <div style="background:#005EB8;color:#fff;padding:18px 24px;display:flex;align-items:center;gap:12px;flex-shrink:0;">
+      <div style="background:#fff;border-radius:6px;padding:4px 8px;"><img src="https://www.nhs.uk/nhschoicesContent/imagecontent/icons/apple-touch-icon.png" style="height:22px;vertical-align:middle;"></div>
+      <div style="flex:1;">
+        <div id="nhsModalTitle" style="font-size:17px;font-weight:800;"></div>
+        <div style="font-size:11px;opacity:.8;">NHS Official Health Information</div>
+      </div>
+      <button onclick="closeNHSModal()" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:20px;">&times;</button>
+    </div>
+    <div id="nhsModalBody" style="overflow-y:auto;padding:20px 24px;flex:1;"></div>
+    <div id="nhsModalFooter" style="padding:12px 24px;border-top:1px solid #e5e7eb;background:#f9fafb;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+      <span style="font-size:11px;color:#6b7280;">Source: NHS.uk — Official UK Health Information</span>
+      <a id="nhsModalLink" href="#" target="_blank" style="font-size:12px;font-weight:700;color:#005EB8;text-decoration:none;">Read full NHS guide →</a>
+    </div>
+  </div>
+</div>
+
+<script>
+function showNHSGuide(condition) {
+  const modal = document.getElementById('nhsModal');
+  const body  = document.getElementById('nhsModalBody');
+  const title = document.getElementById('nhsModalTitle');
+  const link  = document.getElementById('nhsModalLink');
+
+  title.textContent = condition;
+  link.href = '#';
+  body.innerHTML = `<div style="text-align:center;padding:40px 0;">
+    <div style="width:40px;height:40px;border:3px solid #005EB8;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;"></div>
+    <div style="color:#6b7280;font-size:13px;">Loading NHS information...</div>
+  </div>`;
+  modal.style.display = 'flex';
+
+  fetch(`../api/nhs-condition.php?condition=${encodeURIComponent(condition)}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        body.innerHTML = `
+          <div style="text-align:center;padding:30px 0;">
+            <div style="font-size:40px;margin-bottom:12px;">🔍</div>
+            <p style="color:#6b7280;font-size:14px;">NHS information for "<strong>${condition}</strong>" wasn't found automatically.</p>
+            <a href="https://www.nhs.uk/search/results/?q=${encodeURIComponent(condition)}" target="_blank"
+               style="display:inline-flex;align-items:center;gap:8px;margin-top:16px;background:#005EB8;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:700;font-size:13px;">
+              🔗 Search on NHS.uk
+            </a>
+          </div>`;
+        return;
+      }
+      title.textContent = data.name || condition;
+      link.href = data.url;
+
+      let html = '';
+      if (data.summary) {
+        html += `<div style="background:#EFF6FF;border-left:4px solid #005EB8;border-radius:8px;padding:14px 16px;margin-bottom:16px;">
+          <p style="margin:0;font-size:13.5px;color:#1e3a5f;line-height:1.7;">${data.summary}</p>
+        </div>`;
+      }
+      if (data.sections && data.sections.length) {
+        data.sections.forEach(sec => {
+          html += `<div style="margin-bottom:14px;">
+            <div style="font-weight:700;font-size:13px;color:#0A1F44;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+              <span style="width:6px;height:6px;background:#005EB8;border-radius:50%;display:inline-block;"></span>
+              ${sec.heading}
+            </div>
+            <p style="font-size:13px;color:#374151;line-height:1.6;margin:0 0 0 12px;">${sec.text}</p>
+          </div>`;
+        });
+      }
+      html += `<div style="margin-top:16px;background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;padding:12px 14px;font-size:12px;color:#92400E;">
+        <strong>⚠️ Important:</strong> This information is for guidance only. Always consult your doctor for personal medical advice.
+      </div>`;
+      body.innerHTML = html;
+    })
+    .catch(() => {
+      body.innerHTML = `<p style="text-align:center;color:#6b7280;padding:30px;">Could not load NHS information. Please check your connection.</p>`;
+    });
+}
+function closeNHSModal() {
+  document.getElementById('nhsModal').style.display = 'none';
+}
+document.getElementById('nhsModal').addEventListener('click', function(e) {
+  if (e.target === this) closeNHSModal();
+});
+</script>
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
 </body>
 </html>
