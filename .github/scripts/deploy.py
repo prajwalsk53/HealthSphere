@@ -8,7 +8,7 @@ HOSTNAME = 'access-5020406432.webspace-host.com'
 PORT     = 22
 USERNAME = os.environ['SFTP_USER']
 PASSWORD = os.environ['SFTP_PASS']
-REMOTE_BASE = '/HealthSphere'
+REMOTE_BASE = '/public/HealthSphere'
 LOCAL_BASE  = '.'
 
 EXCLUDE_DIRS  = {'.git', 'logs', 'sql', 'node_modules', '.github'}
