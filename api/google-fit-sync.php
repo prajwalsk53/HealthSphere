@@ -145,20 +145,19 @@ foreach ($sleepData['bucket'] ?? [] as $bucket) {
     }
 }
 
-// ── Upsert into health_metrics ─────────────────────────────────────
+// ── Delete existing wearable rows for these dates then re-insert ───
+$dates = array_keys(array_filter($dailyData, fn($d) => !empty($d)));
+if ($dates) {
+    $placeholders = implode(',', array_fill(0, count($dates), '?'));
+    $pdo->prepare("DELETE FROM health_metrics WHERE patient_id=? AND source='wearable' AND metric_date IN ($placeholders)")
+        ->execute(array_merge([$uid], $dates));
+}
+
 $inserted = 0;
 $stmt = $pdo->prepare("
     INSERT INTO health_metrics
         (patient_id, metric_date, steps_count, calories_burned, heart_rate, weight_kg, sleep_hours, source)
-    VALUES
-        (?, ?, ?, ?, ?, ?, ?, 'wearable')
-    ON DUPLICATE KEY UPDATE
-        steps_count     = COALESCE(VALUES(steps_count), steps_count),
-        calories_burned = COALESCE(VALUES(calories_burned), calories_burned),
-        heart_rate      = COALESCE(VALUES(heart_rate), heart_rate),
-        weight_kg       = COALESCE(VALUES(weight_kg), weight_kg),
-        sleep_hours     = COALESCE(VALUES(sleep_hours), sleep_hours),
-        source          = 'wearable'
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'wearable')
 ");
 
 foreach ($dailyData as $date => $d) {
