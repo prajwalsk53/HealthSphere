@@ -96,6 +96,10 @@ $activeTab  = $_GET['tab'] ?? 'records';
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
               <?= getStatusBadge($r['result_status']) ?>
+              <a href="../api/lab-report.php?id=<?= $r['id'] ?>" target="_blank"
+                style="font-size:10px;padding:3px 8px;border:1px solid #DC2626;color:#DC2626;background:#FEF2F2;border-radius:5px;text-decoration:none;display:flex;align-items:center;gap:4px;font-weight:600;">
+                <i class="fas fa-file-pdf"></i> PDF Report
+              </a>
               <button onclick="showNHSGuide('<?= e(addslashes($r['title'])) ?>')"
                 style="font-size:10px;padding:3px 8px;border:1px solid #005EB8;color:#005EB8;background:#EBF3FB;border-radius:5px;cursor:pointer;display:flex;align-items:center;gap:4px;font-weight:600;">
                 <img src="https://www.nhs.uk/nhschoicesContent/imagecontent/icons/apple-touch-icon.png" style="width:12px;height:12px;border-radius:2px;"> NHS Guide
