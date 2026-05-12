@@ -473,7 +473,7 @@ html, body { height: 100%; font-family: 'Inter', sans-serif; }
           <?php
           $demos = [
             ['Emma Patel',     'emma.patel@email.com',               'Patient',      'rb-p','🧑','#DBEAFE'],
-            ['Dr. Emma Hall',  'emma.hall@leicesterhospital.nhs.uk', 'Doctor',       'rb-d','👩‍⚕️','#DCFCE7'],
+            ['Dr. Jessica Johns',  'jessica.johns@leicesterhospital.nhs.uk', 'Doctor',       'rb-d','👩‍⚕️','#DCFCE7'],
             ['System Admin',   'admin@healthsphere.info',          'Admin',        'rb-a','🛡️','#FEF3C7'],
             ['W. Jayson',      'w.jayson@dhsc.gov.uk',               'Gov. Analyst', 'rb-g','🏛️','#EDE9FE'],
           ];
