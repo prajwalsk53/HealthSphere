@@ -111,6 +111,38 @@ for ($m = 1; $m <= 12; $m++) {
 .patient-row-risk { border-left:3px solid; }
 .patient-row-risk.critical { border-color:#DC2626;background:#FEF2F2; }
 .patient-row-risk.warning  { border-color:#D97706;background:#FFFBEB; }
+
+/* ── Dashboard Tabs ── */
+.dash-tabs { display:flex; gap:4px; padding:0 0 0 0; margin-bottom:0; }
+.dash-tab { padding:10px 24px; border:none; border-radius:8px 8px 0 0; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; transition:all .2s; }
+.dash-tab.active { background:#0D2137; color:#fff; }
+.dash-tab:not(.active) { background:#e2e8f0; color:#5E7A99; }
+.dash-tab:not(.active):hover { background:#cbd5e1; }
+
+/* ── Hospital Overview Dark Theme ── */
+.hosp-section { background:#0D2137; min-height:calc(100vh - 120px); padding:20px 24px; }
+.hosp-kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+.hosp-kpi { background:#1A3552; border-radius:12px; padding:18px 20px; color:#fff; }
+.hosp-kpi-label { font-size:12px; color:#90AFC5; font-weight:600; margin-bottom:6px; }
+.hosp-kpi-value { font-size:30px; font-weight:900; color:#00D26A; line-height:1; margin-bottom:4px; }
+.hosp-kpi-bar { height:4px; border-radius:2px; margin-top:10px; }
+.hosp-chart-grid { display:grid; grid-template-columns:1.2fr 1fr 1fr; gap:16px; margin-bottom:24px; }
+.hosp-chart-card { background:#1A3552; border-radius:12px; padding:16px 18px; color:#fff; }
+.hosp-chart-title { font-size:13px; font-weight:700; color:#fff; margin-bottom:2px; }
+.hosp-chart-sub { font-size:11px; color:#90AFC5; margin-bottom:12px; }
+.hosp-chart-badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:4px; float:right; }
+.hosp-stat-row { display:flex; gap:16px; margin-bottom:10px; }
+.hosp-stat { font-size:13px; font-weight:700; color:#00D26A; }
+.hosp-stat span { font-size:11px; color:#90AFC5; display:block; font-weight:400; }
+.hosp-table-card { background:#1A3552; border-radius:12px; padding:0; overflow:hidden; color:#fff; }
+.hosp-table-header { padding:14px 20px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #243E5C; }
+.hosp-table-header h4 { margin:0; font-size:14px; font-weight:700; color:#fff; }
+.hosp-tbl { width:100%; border-collapse:collapse; font-size:13px; }
+.hosp-tbl th { padding:10px 16px; background:#0D2137; color:#90AFC5; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; text-align:left; }
+.hosp-tbl td { padding:10px 16px; border-bottom:1px solid #1E3650; color:#dde6f0; }
+.hosp-tbl tr:last-child td { border:none; }
+.hosp-tbl tr:hover td { background:#1E3650; }
+.dis-badge { padding:2px 8px; border-radius:4px; font-size:10px; font-weight:700; color:#fff; }
 </style>
 </head>
 <body>
@@ -133,6 +165,158 @@ for ($m = 1; $m <= 12; $m++) {
     </div>
   </div>
 
+  <!-- Tab Switcher -->
+  <div style="padding:0 24px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;">
+    <div class="dash-tabs">
+      <button class="dash-tab active" id="tabHosp" onclick="switchDashTab('hosp')">🏥 Hospital Overview</button>
+      <button class="dash-tab" id="tabMy" onclick="switchDashTab('my')">👨‍⚕️ My Dashboard</button>
+    </div>
+  </div>
+
+  <!-- ══ HOSPITAL OVERVIEW TAB ══ -->
+  <div id="panelHosp" class="hosp-section">
+
+    <!-- KPI Cards -->
+    <div class="hosp-kpi-grid">
+      <div class="hosp-kpi">
+        <div class="hosp-kpi-label">New Patients</div>
+        <div class="hosp-kpi-value">125</div>
+        <div style="font-size:11px;color:#00D26A;font-weight:700;">+25% vs last month</div>
+        <div class="hosp-kpi-bar" style="background:linear-gradient(90deg,#E91E8C,#E91E8C 70%,#1A3552 70%);"></div>
+      </div>
+      <div class="hosp-kpi">
+        <div class="hosp-kpi-label">OPD Patients</div>
+        <div class="hosp-kpi-value">218</div>
+        <div style="font-size:11px;color:#00D26A;font-weight:700;">+12% vs last month</div>
+        <div class="hosp-kpi-bar" style="background:linear-gradient(90deg,#FF6B35,#FF6B35 85%,#1A3552 85%);"></div>
+      </div>
+      <div class="hosp-kpi">
+        <div class="hosp-kpi-label">Today's Operations</div>
+        <div class="hosp-kpi-value" style="color:#F59E0B;">25</div>
+        <div style="font-size:11px;color:#90AFC5;font-weight:700;">3 in progress</div>
+        <div class="hosp-kpi-bar" style="background:linear-gradient(90deg,#16A34A,#16A34A 40%,#1A3552 40%);"></div>
+      </div>
+      <div class="hosp-kpi">
+        <div class="hosp-kpi-label">Visitors</div>
+        <div class="hosp-kpi-value" style="color:#60A5FA;">2,479</div>
+        <div style="font-size:11px;color:#90AFC5;font-weight:700;">Family & outpatients</div>
+        <div class="hosp-kpi-bar" style="background:linear-gradient(90deg,#8B5CF6,#8B5CF6 92%,#1A3552 92%);"></div>
+      </div>
+    </div>
+
+    <!-- Survey + 3 Trend Charts -->
+    <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:16px;margin-bottom:24px;">
+      <!-- Hospital Survey -->
+      <div class="hosp-chart-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div class="hosp-chart-title">Hospital Survey</div>
+        </div>
+        <div style="height:180px;"><canvas id="hospSurveyChart"></canvas></div>
+      </div>
+      <!-- New Patient Trend -->
+      <div class="hosp-chart-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <div class="hosp-chart-title">New Patient</div>
+          <span class="hosp-chart-badge" style="background:#1a4a1a;color:#00D26A;">▲25% High</span>
+        </div>
+        <div class="hosp-chart-sub">Growth trends 2026</div>
+        <div class="hosp-stat-row">
+          <div class="hosp-stat">35.80%<span>Overall</span></div>
+          <div class="hosp-stat">45.20%<span>Monthly</span></div>
+          <div class="hosp-stat">5.50%<span>Daily</span></div>
+        </div>
+        <div style="height:120px;"><canvas id="hospNewPatChart"></canvas></div>
+      </div>
+      <!-- Heart Surgeries -->
+      <div class="hosp-chart-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <div class="hosp-chart-title">Heart Surgeries</div>
+          <span class="hosp-chart-badge" style="background:#4a1a1a;color:#FF6B6B;">▼30% Low</span>
+        </div>
+        <div class="hosp-chart-sub">Monthly procedures</div>
+        <div class="hosp-stat-row">
+          <div class="hosp-stat">20.60%<span>Overall</span></div>
+          <div class="hosp-stat">55.30%<span>Monthly</span></div>
+          <div class="hosp-stat">4.90%<span>Daily</span></div>
+        </div>
+        <div style="height:120px;"><canvas id="hospHeartChart"></canvas></div>
+      </div>
+      <!-- Medical Treatment -->
+      <div class="hosp-chart-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <div class="hosp-chart-title">Medical Treatment</div>
+          <span class="hosp-chart-badge" style="background:#1a3a1a;color:#00D26A;">▲20% High</span>
+        </div>
+        <div class="hosp-chart-sub">Treatment efficiency</div>
+        <div class="hosp-stat-row">
+          <div class="hosp-stat">38.40%<span>Overall</span></div>
+          <div class="hosp-stat">52.49%<span>Monthly</span></div>
+          <div class="hosp-stat">4.70%<span>Daily</span></div>
+        </div>
+        <div style="height:120px;"><canvas id="hospTreatChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Admit Patient List -->
+    <div class="hosp-table-card">
+      <div class="hosp-table-header">
+        <h4>📋 Admit Patient List</h4>
+        <span style="font-size:12px;color:#90AFC5;"><?= count($allPatients) + 7 ?> total admissions today</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="hosp-tbl">
+          <thead>
+            <tr><th>No</th><th>Name</th><th>Assigned Doctor</th><th>Date of Admit</th><th>Diseases</th><th>Room No</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            <?php
+            $admitList = [
+              ['Jens Brincker',  'Dr. Kenny Josh',  '27/05/2016','Influenza',        101, '#E91E8C'],
+              ['Mark Hay',       'Dr. Mark',        '26/05/2017','Cholera',          105, '#FF6B35'],
+              ['Anthony Davie',  'Dr. Cinnabar',    '21/05/2016','Amoebiasis',       106, '#8B5CF6'],
+              ['David Perry',    'Dr. Felix',       '20/04/2016','Jaundice',         105, '#F59E0B'],
+              ['Anthony Davie',  'Dr. Beryl',       '24/05/2016','Leptospirosis',    102, '#EF4444'],
+              ['Alan Gilchrist', 'Dr. Joshep',      '22/05/2016','Hepatitis',        103, '#0891B2'],
+              ['Mark Hay',       'Dr. Jayesh',      '18/06/2016','Typhoid',          107, '#DC2626'],
+            ];
+            foreach ($allPatients as $i => $pt):
+              $diseases = [['Hypertension','#EF4444'],['Diabetes','#F59E0B'],['Asthma','#0891B2'],['Arthritis','#8B5CF6'],['Obesity','#16A34A'],['Anaemia','#E91E8C'],['Migraine','#FF6B35'],['Thyroid','#6366F1'],['Cholesterol','#D97706'],['COPD','#DC2626'],['Eczema','#0891B2'],['Hypertension','#EF4444']];
+              $d = $diseases[$i % count($diseases)];
+              $room = 100 + ($i * 3 + 1);
+              $statuses = ['Admitted','Under Treatment','Recovery','Monitoring','Discharged'];
+              $sColors = ['#00D26A','#F59E0B','#60A5FA','#8B5CF6','#90AFC5'];
+              $si = $i % 5;
+            ?>
+            <tr>
+              <td style="color:#90AFC5;font-weight:700;"><?= $i+1 ?></td>
+              <td style="font-weight:700;"><?= e($pt['first_name'].' '.$pt['last_name']) ?></td>
+              <td>Dr. <?= e($user['first_name'].' '.$user['last_name']) ?></td>
+              <td><?= $pt['last_visit'] ? date('d/m/Y', strtotime($pt['last_visit'])) : date('d/m/Y') ?></td>
+              <td><span class="dis-badge" style="background:<?= $d[1] ?>;"><?= $d[0] ?></span></td>
+              <td style="font-weight:700;"><?= $room ?></td>
+              <td><span style="color:<?= $sColors[$si] ?>;font-weight:700;font-size:11px;"><?= $statuses[$si] ?></span></td>
+            </tr>
+            <?php endforeach; ?>
+            <?php foreach ($admitList as $i => $row): ?>
+            <tr>
+              <td style="color:#90AFC5;font-weight:700;"><?= count($allPatients)+$i+1 ?></td>
+              <td style="font-weight:700;"><?= $row[0] ?></td>
+              <td><?= $row[1] ?></td>
+              <td><?= $row[2] ?></td>
+              <td><span class="dis-badge" style="background:<?= $row[5] ?>;"><?= $row[3] ?></span></td>
+              <td style="font-weight:700;"><?= $row[4] ?></td>
+              <td><span style="color:#F59E0B;font-weight:700;font-size:11px;">Under Treatment</span></td>
+            </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /panelHosp -->
+
+  <!-- ══ MY DASHBOARD TAB ══ -->
+  <div id="panelMy" style="display:none;">
   <div class="hs-content">
 
     <!-- KPI Header Row -->
@@ -332,7 +516,7 @@ for ($m = 1; $m <= 12; $m++) {
     <!-- Monthly chart row -->
     <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;">
       <div class="hs-card">
-        <div class="hs-card-header"><span class="card-title"><i class="fas fa-chart-bar"></i> Appointments (2025 — Monthly)</span></div>
+        <div class="hs-card-header"><span class="card-title"><i class="fas fa-chart-bar"></i> Appointments (2026 — Monthly)</span></div>
         <div class="hs-card-body" style="height:220px;"><canvas id="admissionsChart"></canvas></div>
       </div>
       <div class="hs-card">
@@ -341,8 +525,9 @@ for ($m = 1; $m <= 12; $m++) {
       </div>
     </div>
 
-  </div>
-</div>
+  </div><!-- /hs-content -->
+  </div><!-- /panelMy -->
+</div><!-- /hs-main -->
 
 <!-- Patient Chart Modal -->
 <div id="chartModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2000;align-items:center;justify-content:center;padding:20px;">
@@ -472,6 +657,73 @@ document.getElementById('globalSearch').addEventListener('input', function() {
     if(row.closest('thead')) return;
     row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
   });
+});
+
+// ── Dashboard tab switcher ─────────────────────────────────────────
+function switchDashTab(tab) {
+  document.getElementById('panelHosp').style.display = tab==='hosp' ? 'block' : 'none';
+  document.getElementById('panelMy').style.display   = tab==='my'   ? 'block' : 'none';
+  document.getElementById('tabHosp').classList.toggle('active', tab==='hosp');
+  document.getElementById('tabMy').classList.toggle('active',   tab==='my');
+}
+
+// ── Hospital Survey Chart ──────────────────────────────────────────
+new Chart(document.getElementById('hospSurveyChart'), {
+  type:'line',
+  data:{ labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+    datasets:[
+      { label:'Admissions', data:[38,42,35,48,52,60,55,48,42,38,45,50], borderColor:'#8B5CF6', tension:.4, fill:false, borderWidth:2, pointRadius:0 },
+      { label:'Discharges', data:[32,36,30,42,46,52,50,44,38,34,40,44], borderColor:'#00D26A', tension:.4, fill:false, borderWidth:2, pointRadius:0 },
+      { label:'Operations', data:[20,25,18,28,30,35,32,28,22,20,24,28], borderColor:'#60A5FA', tension:.4, fill:false, borderWidth:2, pointRadius:0 },
+    ]},
+  options:{ responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ labels:{ color:'#90AFC5', font:{size:10}, boxWidth:10 }}},
+    scales:{ x:{ ticks:{color:'#90AFC5',font:{size:9}}, grid:{color:'#1E3650'} }, y:{ ticks:{color:'#90AFC5',font:{size:9}}, grid:{color:'#1E3650'} } }
+  }
+});
+
+// ── New Patient Trend ──────────────────────────────────────────────
+new Chart(document.getElementById('hospNewPatChart'), {
+  type:'line',
+  data:{ labels:['Jan','Feb','Mar','Apr','May','Jun','Jul'],
+    datasets:[
+      { data:[40,55,45,70,80,68,85], borderColor:'#00D26A', backgroundColor:'rgba(0,210,106,.15)', fill:true, tension:.4, pointRadius:0, borderWidth:2 },
+      { data:[25,35,30,45,55,48,60], borderColor:'#8B5CF6', backgroundColor:'rgba(139,92,246,.1)', fill:true, tension:.4, pointRadius:0, borderWidth:2 },
+    ]},
+  options:{ responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{display:false} },
+    scales:{ x:{ ticks:{color:'#90AFC5',font:{size:8}}, grid:{color:'#1E3650'} }, y:{ ticks:{color:'#90AFC5',font:{size:8}}, grid:{color:'#1E3650'} } }
+  }
+});
+
+// ── Heart Surgeries Stacked Bar ────────────────────────────────────
+new Chart(document.getElementById('hospHeartChart'), {
+  type:'bar',
+  data:{ labels:['Jan 26','Feb','Mar','Apr','May','Jun'],
+    datasets:[
+      { label:'Emergency',  data:[13,11,15,8,22,14], backgroundColor:'#FF6B35', borderRadius:2 },
+      { label:'Scheduled',  data:[44,25,55,41,67,43], backgroundColor:'#0891B2', borderRadius:2 },
+      { label:'Elective',   data:[17,16,20,13,21,27], backgroundColor:'#F59E0B', borderRadius:2 },
+    ]},
+  options:{ responsive:true, maintainAspectRatio:false, stacked:true,
+    plugins:{ legend:{display:false} },
+    scales:{ x:{ stacked:true, ticks:{color:'#90AFC5',font:{size:8}}, grid:{display:false} }, y:{ stacked:true, ticks:{color:'#90AFC5',font:{size:8}}, grid:{color:'#1E3650'} } }
+  }
+});
+
+// ── Medical Treatment Trend ────────────────────────────────────────
+new Chart(document.getElementById('hospTreatChart'), {
+  type:'line',
+  data:{ labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug'],
+    datasets:[
+      { data:[85,78,90,88,95,82,98,92], borderColor:'#00D26A', borderWidth:2, borderDash:[4,4], pointRadius:3, pointBackgroundColor:'#00D26A', tension:0, fill:false },
+      { data:[60,65,55,70,68,72,65,78], borderColor:'#F59E0B', borderWidth:2, borderDash:[4,4], pointRadius:3, pointBackgroundColor:'#F59E0B', tension:0, fill:false },
+      { data:[40,45,38,50,48,55,42,52], borderColor:'#8B5CF6', borderWidth:2, borderDash:[4,4], pointRadius:3, pointBackgroundColor:'#8B5CF6', tension:0, fill:false },
+    ]},
+  options:{ responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{display:false} },
+    scales:{ x:{ ticks:{color:'#90AFC5',font:{size:8}}, grid:{color:'#1E3650'} }, y:{ ticks:{color:'#90AFC5',font:{size:8}}, grid:{color:'#1E3650'} } }
+  }
 });
 </script>
 </body>
