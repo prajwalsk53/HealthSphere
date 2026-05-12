@@ -88,14 +88,13 @@ $notifCount = getUnreadCount($pdo, $uid);
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
             <div class="input-icon-wrap" style="flex:1;max-width:480px;"><i class="fas fa-search"></i><input type="text" id="nlmQ" class="form-control" placeholder="Search: e.g. cystic fibrosis, sickle cell, BRCA..."></div>
             <button onclick="searchNLM()" class="btn-hs btn-primary-hs"><i class="fas fa-search"></i> Search</button>
-            <span style="font-size:12px;color:var(--hs-muted);"><i class="fas fa-university" style="color:#7C3AED;"></i> US National Library of Medicine — free, no key</span>
           </div>
         </div>
       </div>
 
       <div id="nlmLoading" style="display:none;text-align:center;padding:40px;color:var(--hs-muted);"><i class="fas fa-spinner fa-spin fa-2x"></i><br><br>Searching MedlinePlus Genetics...</div>
       <div id="nlmError"   style="display:none;background:#FEE2E2;border:1px solid #FECACA;border-radius:8px;padding:14px 18px;color:#991B1B;font-size:13px;margin-bottom:16px;"></div>
-      <div id="nlmEmpty"   style="display:none;text-align:center;padding:60px 20px;color:var(--hs-muted);"><i class="fas fa-dna fa-3x" style="margin-bottom:16px;opacity:.3;"></i><br>Search for any genetic condition to get data from the US National Library of Medicine.</div>
+      <div id="nlmEmpty"   style="display:none;text-align:center;padding:60px 20px;color:var(--hs-muted);"><i class="fas fa-dna fa-3x" style="margin-bottom:16px;opacity:.3;"></i><br>Search for any genetic condition using the MedlinePlus Genetics database.</div>
 
       <!-- Results list -->
       <div id="nlmResults" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;"></div>
@@ -141,7 +140,7 @@ $notifCount = getUnreadCount($pdo, $uid);
         <div><label class="form-label">Exercise Guidance</label><input type="text" name="exercise_guidance" class="form-control" placeholder="As tolerated"></div>
         <div><label class="form-label">Patient Count</label><input type="number" name="patient_count" class="form-control" value="0"></div>
       </div>
-      <div style="font-size:11px;color:var(--hs-muted);margin-bottom:14px;"><i class="fas fa-info-circle"></i> Data sourced from MedlinePlus Genetics (US National Library of Medicine)</div>
+      <div style="font-size:11px;color:var(--hs-muted);margin-bottom:14px;"><i class="fas fa-info-circle"></i> Data sourced from MedlinePlus Genetics</div>
       <div style="display:flex;gap:12px;">
         <button type="submit" class="btn-hs btn-primary-hs" style="flex:1;justify-content:center;"><i class="fas fa-download"></i> Import to Registry</button>
         <button type="button" onclick="document.getElementById('addDiseaseModal').style.display='none'" class="btn-hs btn-outline-hs">Cancel</button>

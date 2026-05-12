@@ -66,37 +66,59 @@ if ($type === 'detail' && $slug) {
     exit;
 }
 
-// ── Search: query NLM Web Search for GHR conditions ─────────────
+// ── Search: MedlinePlus Genetics via site-restricted search ─────────
+// Try NLM wsearch with MedlinePlus database (ghr was retired in 2023)
+$results = [];
+
 $searchUrl = 'https://wsearch.nlm.nih.gov/ws/query?' . http_build_query([
-    'db'      => 'ghr',
-    'term'    => $query,
-    'retmax'  => 12,
+    'db'      => 'MedlinePlus',
+    'term'    => $query . ' genetics condition',
+    'retmax'  => 15,
     'rettype' => 'brief',
 ]);
-$ctx = stream_context_create(['http' => ['timeout' => 8, 'user_agent' => 'HealthSphere/1.0']]);
+$ctx = stream_context_create(['http' => ['timeout' => 10, 'user_agent' => 'HealthSphere/1.0 (Educational)']]);
 $xml = @file_get_contents($searchUrl, false, $ctx);
-if (!$xml) { echo json_encode(['results' => [], 'error' => 'NLM API unavailable']); exit; }
 
-libxml_use_internal_errors(true);
-$xmlObj = simplexml_load_string($xml);
-if (!$xmlObj) { echo json_encode(['results' => []]); exit; }
-
-$results = [];
-foreach ($xmlObj->list->document ?? [] as $docNode) {
-    $title = $urlRaw = $snippet = '';
-    foreach ($docNode->content as $c) {
-        $name = (string)$c['name'];
-        if ($name === 'title')    $title   = (string)$c;
-        if ($name === 'url')      $urlRaw  = (string)$c;
-        if ($name === 'snippets') $snippet = strip_tags((string)$c);
+if ($xml) {
+    libxml_use_internal_errors(true);
+    $xmlObj = simplexml_load_string($xml);
+    if ($xmlObj) {
+        foreach ($xmlObj->list->document ?? [] as $docNode) {
+            $title = $urlRaw = $snippet = '';
+            foreach ($docNode->content as $c) {
+                $name = (string)$c['name'];
+                if ($name === 'title')    $title   = strip_tags((string)$c);
+                if ($name === 'url')      $urlRaw  = (string)$c;
+                if ($name === 'snippets') $snippet = strip_tags((string)$c);
+            }
+            if (preg_match('/genetics\/condition\/([a-z0-9\-]+)\/?/', $urlRaw, $m)) {
+                $results[] = [
+                    'name'    => $title,
+                    'slug'    => $m[1],
+                    'snippet' => substr($snippet, 0, 200),
+                    'url'     => $urlRaw,
+                ];
+            }
+        }
     }
-    if (preg_match('/genetics\/condition\/([a-z0-9\-]+)\/?/', $urlRaw, $m)) {
-        $results[] = [
-            'name'    => $title,
-            'slug'    => $m[1],
-            'snippet' => substr($snippet, 0, 200),
-            'url'     => $urlRaw,
-        ];
+}
+
+// ── Fallback: try direct slug guess from query ───────────────────────
+if (empty($results)) {
+    $slug = strtolower(trim(preg_replace('/[^a-z0-9]+/', '-', $query), '-'));
+    $testUrl = "https://medlineplus.gov/download/genetics/condition/{$slug}.json";
+    $testCtx = stream_context_create(['http' => ['timeout' => 6, 'user_agent' => 'HealthSphere/1.0']]);
+    $raw = @file_get_contents($testUrl, false, $testCtx);
+    if ($raw) {
+        $data = json_decode($raw, true);
+        if (!empty($data['name'])) {
+            $results[] = [
+                'name'    => $data['name'],
+                'slug'    => $slug,
+                'snippet' => substr(strip_tags($data['summary'] ?? ''), 0, 200),
+                'url'     => "https://medlineplus.gov/genetics/condition/{$slug}/",
+            ];
+        }
     }
 }
 
