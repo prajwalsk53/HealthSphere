@@ -11,7 +11,7 @@ PASSWORD = os.environ['SFTP_PASS']
 REMOTE_BASE = '/public/HealthSphere'
 LOCAL_BASE  = '.'
 
-EXCLUDE_DIRS  = {'.git', 'logs', 'sql', 'node_modules', '.github'}
+EXCLUDE_DIRS  = {'.git', 'logs', 'sql', 'node_modules', '.github', 'flutter_app', 'app'}
 EXCLUDE_FILES = {'mail.php', 'deploy_key', 'deploy_key.pub', 'authorized_keys'}
 EXCLUDE_EXT   = {'.sql'}
 
