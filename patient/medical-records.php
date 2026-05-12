@@ -108,10 +108,18 @@ $activeTab  = $_GET['tab'] ?? 'records';
           </div>
           <p style="font-size:13px;color:var(--hs-text);line-height:1.6;margin-bottom:10px;"><?= e($r['result']) ?></p>
           <?php if ($r['first_name']): ?>
-          <div style="font-size:12px;color:var(--hs-muted);border-top:1px solid var(--hs-border);padding-top:8px;">
-            <i class="fas fa-user-md"></i> Dr. <?= e($r['first_name'].' '.$r['last_name']) ?>
-            &nbsp;·&nbsp;
-            <i class="fas fa-calendar"></i> <?= $r['test_date'] ? 'Added '.formatDate($r['test_date']) : '' ?>
+          <div style="font-size:12px;color:var(--hs-muted);border-top:1px solid var(--hs-border);padding-top:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+            <span>
+              <i class="fas fa-user-md"></i> Dr. <?= e($r['first_name'].' '.$r['last_name']) ?>
+              &nbsp;·&nbsp;
+              <i class="fas fa-calendar"></i> <?= $r['test_date'] ? 'Added '.formatDate($r['test_date']) : '' ?>
+            </span>
+            <?php if (!empty($r['file_path'])): ?>
+            <a href="../<?= e($r['file_path']) ?>" target="_blank" download
+               style="font-size:11px;background:#16A34A;color:#fff;padding:3px 10px;border-radius:5px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+              <i class="fas fa-download"></i> Download Attached File
+            </a>
+            <?php endif; ?>
           </div>
           <?php endif; ?>
         </div>

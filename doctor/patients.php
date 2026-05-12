@@ -18,6 +18,32 @@ $viewId = (int)($_GET['id'] ?? 0);
 $viewPatient = null;
 $successMsg = $errorMsg = '';
 
+// ── Ensure upload dirs exist ─────────────────────────────────────────
+$uploadBase = __DIR__ . '/../uploads';
+foreach (['lab_results','prescriptions'] as $d) {
+    if (!is_dir("{$uploadBase}/{$d}")) @mkdir("{$uploadBase}/{$d}", 0755, true);
+}
+
+// ── File upload helper ───────────────────────────────────────────────
+function handleUpload(string $field, string $subdir): ?string {
+    global $uploadBase;
+    if (empty($_FILES[$field]['tmp_name']) || $_FILES[$field]['error'] !== UPLOAD_ERR_OK) return null;
+    $allowed = ['application/pdf','image/jpeg','image/png','image/gif','image/webp'];
+    $finfo   = finfo_open(FILEINFO_MIME_TYPE);
+    $mime    = finfo_file($finfo, $_FILES[$field]['tmp_name']);
+    finfo_close($finfo);
+    if (!in_array($mime, $allowed)) return null;
+    if ($_FILES[$field]['size'] > 10 * 1024 * 1024) return null; // 10MB max
+    $ext  = pathinfo($_FILES[$field]['name'], PATHINFO_EXTENSION);
+    $name = uniqid('hs_', true) . '.' . strtolower($ext);
+    $dest = "{$uploadBase}/{$subdir}/{$name}";
+    if (move_uploaded_file($_FILES[$field]['tmp_name'], $dest)) return "uploads/{$subdir}/{$name}";
+    return null;
+}
+
+// ── Ensure prescriptions has file_path column ────────────────────────
+try { $pdo->exec("ALTER TABLE prescriptions ADD COLUMN file_path VARCHAR(255) NULL"); } catch (Exception $e) {}
+
 // ── Handle Add Prescription (POST) ──────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_prescription']) && $viewId) {
     $medName  = trim($_POST['medication_name'] ?? '');
@@ -27,9 +53,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_prescription']) &
     $instruct = trim($_POST['instructions'] ?? '');
     $start    = $_POST['start_date'] ?? date('Y-m-d');
     if ($medName && $dosage && $freq) {
-        $end = date('Y-m-d', strtotime($start . ' +' . (intval($duration) ?: 30) . ' days'));
-        $pdo->prepare("INSERT INTO prescriptions (patient_id,doctor_id,medication_name,dosage,frequency,duration,instructions,start_date,end_date,is_active) VALUES (?,?,?,?,?,?,?,?,?,1)")
-            ->execute([$viewId,$uid,$medName,$dosage,$freq,$duration,$instruct,$start,$end]);
+        $end      = date('Y-m-d', strtotime($start . ' +' . (intval($duration) ?: 30) . ' days'));
+        $filePath = handleUpload('rx_file', 'prescriptions');
+        $pdo->prepare("INSERT INTO prescriptions (patient_id,doctor_id,medication_name,dosage,frequency,duration,instructions,start_date,end_date,is_active,file_path) VALUES (?,?,?,?,?,?,?,?,?,1,?)")
+            ->execute([$viewId,$uid,$medName,$dosage,$freq,$duration,$instruct,$start,$end,$filePath]);
         $successMsg = "Prescription for {$medName} added successfully.";
     } else { $errorMsg = "Medication name, dosage and frequency are required."; }
 }
@@ -43,8 +70,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_lab_result']) && 
     $testDt  = $_POST['test_date'] ?? date('Y-m-d');
     $desc    = trim($_POST['description'] ?? '');
     if ($title && $result) {
-        $pdo->prepare("INSERT INTO medical_records (patient_id,doctor_id,record_type,title,result,result_status,description,test_date) VALUES (?,?,?,?,?,?,?,?)")
-            ->execute([$viewId,$uid,$rType,$title,$result,$status,$desc,$testDt]);
+        $filePath = handleUpload('lab_file', 'lab_results');
+        $pdo->prepare("INSERT INTO medical_records (patient_id,doctor_id,record_type,title,result,result_status,description,test_date,file_path) VALUES (?,?,?,?,?,?,?,?,?)")
+            ->execute([$viewId,$uid,$rType,$title,$result,$status,$desc,$testDt,$filePath]);
         $successMsg = "Lab result '{$title}' added and is now visible to the patient.";
     } else { $errorMsg = "Title and result are required."; }
 }
@@ -153,7 +181,7 @@ if ($viewId) {
           </div>
           <div class="hs-card-body p-0">
             <table class="hs-table">
-              <thead><tr><th>Test</th><th>Result</th><th>Status</th><th>Date</th><th>Report</th></tr></thead>
+              <thead><tr><th>Test</th><th>Result</th><th>Status</th><th>Date</th><th>Files</th></tr></thead>
               <tbody>
                 <?php if (!$vpRecords): ?>
                 <tr><td colspan="5" style="text-align:center;color:var(--hs-muted);padding:20px;">No lab results yet.</td></tr>
@@ -164,11 +192,17 @@ if ($viewId) {
                   <td style="font-size:12px;max-width:180px;color:var(--hs-text);"><?= e(strlen($r['result'])>80 ? substr($r['result'],0,80).'…' : $r['result']) ?></td>
                   <td><?= getStatusBadge($r['result_status']) ?></td>
                   <td><?= formatDate($r['test_date']) ?></td>
-                  <td>
+                  <td style="white-space:nowrap;">
                     <a href="../api/lab-report.php?id=<?= $r['id'] ?>" target="_blank"
-                       style="font-size:11px;background:#1565C0;color:#fff;padding:4px 10px;border-radius:5px;text-decoration:none;font-weight:600;white-space:nowrap;">
-                      <i class="fas fa-file-pdf"></i> PDF
+                       style="font-size:11px;background:#1565C0;color:#fff;padding:3px 8px;border-radius:4px;text-decoration:none;font-weight:600;">
+                      <i class="fas fa-file-alt"></i> Report
                     </a>
+                    <?php if (!empty($r['file_path'])): ?>
+                    <a href="../<?= e($r['file_path']) ?>" target="_blank" download
+                       style="font-size:11px;background:#16A34A;color:#fff;padding:3px 8px;border-radius:4px;text-decoration:none;font-weight:600;margin-left:4px;">
+                      <i class="fas fa-download"></i> File
+                    </a>
+                    <?php endif; ?>
                   </td>
                 </tr>
                 <?php endforeach; ?>
@@ -187,20 +221,29 @@ if ($viewId) {
           </div>
           <div class="hs-card-body p-0">
             <table class="hs-table">
-              <thead><tr><th>Medication</th><th>Dosage</th><th>Frequency</th><th>Duration</th><th>Start</th><th>End</th><th>Status</th></tr></thead>
+              <thead><tr><th>Medication</th><th>Dosage</th><th>Frequency</th><th>Start</th><th>End</th><th>Status</th><th>File</th></tr></thead>
               <tbody>
                 <?php if (!$vpMeds): ?>
                 <tr><td colspan="7" style="text-align:center;color:var(--hs-muted);padding:20px;">No prescriptions yet.</td></tr>
                 <?php endif; ?>
                 <?php foreach ($vpMeds as $m): ?>
                 <tr>
-                  <td><strong><?= e($m['medication_name']) ?></strong></td>
+                  <td><strong><?= e($m['medication_name']) ?></strong><br><span style="font-size:11px;color:var(--hs-muted);"><?= e($m['instructions'] ?: '') ?></span></td>
                   <td><?= e($m['dosage']) ?></td>
                   <td><?= e($m['frequency']) ?></td>
-                  <td><?= e($m['duration'] ?: '—') ?></td>
                   <td><?= $m['start_date'] ? formatDate($m['start_date']) : '—' ?></td>
                   <td style="color:<?= $m['end_date'] && $m['end_date'] < date('Y-m-d') ? '#DC2626' : 'inherit' ?>;"><?= $m['end_date'] ? formatDate($m['end_date']) : '—' ?></td>
                   <td><span style="background:<?= $m['is_active']?'#DCFCE7':'#F3F4F6' ?>;color:<?= $m['is_active']?'#166534':'#6B7280' ?>;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;"><?= $m['is_active']?'Active':'Ended' ?></span></td>
+                  <td>
+                    <?php if (!empty($m['file_path'])): ?>
+                    <a href="../<?= e($m['file_path']) ?>" target="_blank" download
+                       style="font-size:11px;background:#7C3AED;color:#fff;padding:3px 8px;border-radius:4px;text-decoration:none;font-weight:600;">
+                      <i class="fas fa-download"></i> Download
+                    </a>
+                    <?php else: ?>
+                    <span style="font-size:11px;color:#ccc;">—</span>
+                    <?php endif; ?>
+                  </td>
                 </tr>
                 <?php endforeach; ?>
               </tbody>
@@ -214,7 +257,7 @@ if ($viewId) {
         <div class="hs-card">
           <div class="hs-card-header"><span class="card-title"><i class="fas fa-plus-circle" style="color:#16A34A;"></i> Add Lab Result</span></div>
           <div class="hs-card-body">
-            <form method="POST" action="?id=<?= $viewId ?>">
+            <form method="POST" action="?id=<?= $viewId ?>" enctype="multipart/form-data">
               <input type="hidden" name="add_lab_result" value="1">
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
                 <div>
@@ -247,9 +290,21 @@ if ($viewId) {
                 <label style="font-size:12px;font-weight:700;color:var(--hs-navy);display:block;margin-bottom:5px;">Result / Findings <span style="color:#DC2626;">*</span></label>
                 <textarea name="result" class="form-control" rows="3" placeholder="e.g. Haemoglobin 13.5 g/dL — within normal range..." required></textarea>
               </div>
-              <div style="margin-bottom:16px;">
+              <div style="margin-bottom:14px;">
                 <label style="font-size:12px;font-weight:700;color:var(--hs-navy);display:block;margin-bottom:5px;">Clinical Notes (optional)</label>
                 <textarea name="description" class="form-control" rows="2" placeholder="Clinical interpretation, recommendations..."></textarea>
+              </div>
+              <div style="margin-bottom:16px;">
+                <label style="font-size:12px;font-weight:700;color:var(--hs-navy);display:block;margin-bottom:5px;">
+                  <i class="fas fa-paperclip"></i> Attach File / Image (optional)
+                </label>
+                <div style="border:2px dashed var(--hs-border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;background:#FAFCFF;" onclick="document.getElementById('lab_file_input').click()">
+                  <i class="fas fa-cloud-upload-alt" style="font-size:24px;color:var(--hs-blue);margin-bottom:8px;display:block;"></i>
+                  <div style="font-size:13px;color:var(--hs-navy);font-weight:600;" id="lab_file_label">Click to upload or drag & drop</div>
+                  <div style="font-size:11px;color:var(--hs-muted);margin-top:4px;">PDF, JPG, PNG — max 10MB</div>
+                  <input type="file" id="lab_file_input" name="lab_file" accept=".pdf,.jpg,.jpeg,.png" style="display:none;"
+                    onchange="document.getElementById('lab_file_label').textContent = this.files[0]?.name || 'Click to upload'">
+                </div>
               </div>
               <div style="display:flex;gap:10px;">
                 <button type="submit" class="btn-hs btn-primary-hs"><i class="fas fa-save"></i> Save & Notify Patient</button>
@@ -266,7 +321,7 @@ if ($viewId) {
         <div class="hs-card">
           <div class="hs-card-header"><span class="card-title"><i class="fas fa-prescription" style="color:#7C3AED;"></i> Add Prescription</span></div>
           <div class="hs-card-body">
-            <form method="POST" action="?id=<?= $viewId ?>">
+            <form method="POST" action="?id=<?= $viewId ?>" enctype="multipart/form-data">
               <input type="hidden" name="add_prescription" value="1">
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
                 <div>
@@ -308,6 +363,18 @@ if ($viewId) {
                 <div>
                   <label style="font-size:12px;font-weight:700;color:var(--hs-navy);display:block;margin-bottom:5px;">Special Instructions</label>
                   <input type="text" name="instructions" class="form-control" placeholder="e.g. Take with food">
+                </div>
+              </div>
+              <div style="margin-bottom:16px;">
+                <label style="font-size:12px;font-weight:700;color:var(--hs-navy);display:block;margin-bottom:5px;">
+                  <i class="fas fa-paperclip"></i> Attach Prescription File / Image (optional)
+                </label>
+                <div style="border:2px dashed var(--hs-border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;background:#FAFCFF;" onclick="document.getElementById('rx_file_input').click()">
+                  <i class="fas fa-cloud-upload-alt" style="font-size:24px;color:#7C3AED;margin-bottom:8px;display:block;"></i>
+                  <div style="font-size:13px;color:var(--hs-navy);font-weight:600;" id="rx_file_label">Click to upload or drag & drop</div>
+                  <div style="font-size:11px;color:var(--hs-muted);margin-top:4px;">PDF, JPG, PNG — max 10MB</div>
+                  <input type="file" id="rx_file_input" name="rx_file" accept=".pdf,.jpg,.jpeg,.png" style="display:none;"
+                    onchange="document.getElementById('rx_file_label').textContent = this.files[0]?.name || 'Click to upload'">
                 </div>
               </div>
               <div style="display:flex;gap:10px;">
