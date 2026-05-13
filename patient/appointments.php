@@ -200,21 +200,20 @@ $msgCount   = getUnreadMessages($pdo, $uid);
           <?php endforeach; ?>
         </select>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-        <div>
-          <label class="form-label">Date *</label>
-          <input type="date" name="appt_date" class="form-control" min="<?= date('Y-m-d') ?>" required>
-        </div>
-        <div>
-          <label class="form-label">Time *</label>
-          <select name="appt_time" class="form-select" required>
-            <option value="">Select time</option>
-            <?php
-            $slots = ['09:00','09:30','10:00','10:30','11:00','11:30','13:00','13:30','14:00','14:30','15:00','16:00'];
-            foreach ($slots as $s): ?>
-            <option value="<?= $s ?>"><?= $s ?></option>
-            <?php endforeach; ?>
-          </select>
+      <div style="margin-bottom:14px;">
+        <label class="form-label">Date *</label>
+        <input type="date" name="appt_date" id="apptDate" class="form-control" min="<?= date('Y-m-d') ?>" required onchange="loadSlots()">
+      </div>
+
+      <!-- Slot picker -->
+      <div style="margin-bottom:14px;">
+        <label class="form-label">Available Time Slots *</label>
+        <input type="hidden" name="appt_time" id="apptTimeHidden" required>
+        <div id="slotsContainer" style="min-height:60px;border:1.5px solid var(--hs-border);border-radius:9px;padding:12px;background:#FAFCFF;">
+          <div id="slotsMsg" style="font-size:13px;color:var(--hs-muted);text-align:center;padding:8px 0;">
+            <i class="fas fa-info-circle"></i> Select a doctor and date to see available slots
+          </div>
+          <div id="slotsGrid" style="display:flex;flex-wrap:wrap;gap:8px;display:none;"></div>
         </div>
       </div>
       <div style="margin-bottom:20px;">
@@ -241,13 +240,77 @@ function selectDoctor(id, name, spec) {
   document.getElementById('selDocSpec').textContent = spec;
   document.getElementById('selectedDoctorInfo').style.display = 'block';
   document.getElementById('bookModal').style.display = 'flex';
+  loadSlots();
 }
 document.getElementById('doctorSelect').addEventListener('change', function() {
   const opt = this.options[this.selectedIndex];
   document.getElementById('selDocName').textContent = opt.dataset.name || '';
   document.getElementById('selDocSpec').textContent = opt.dataset.spec || '';
   document.getElementById('selectedDoctorInfo').style.display = this.value ? 'block' : 'none';
+  loadSlots();
 });
+
+function loadSlots() {
+  const doctorId = document.getElementById('doctorSelect').value;
+  const date     = document.getElementById('apptDate').value;
+  const msg      = document.getElementById('slotsMsg');
+  const grid     = document.getElementById('slotsGrid');
+  const hidden   = document.getElementById('apptTimeHidden');
+
+  hidden.value = '';
+  grid.style.display = 'none';
+  grid.innerHTML = '';
+
+  if (!doctorId || !date) {
+    msg.style.display = 'block';
+    msg.innerHTML = '<i class="fas fa-info-circle"></i> Select a doctor and date to see available slots';
+    return;
+  }
+
+  msg.style.display = 'block';
+  msg.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading available slots...';
+
+  fetch(`../api/doctor-slots.php?doctor_id=${doctorId}&date=${date}`)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.slots || data.slots.length === 0) {
+        msg.innerHTML = '<i class="fas fa-calendar-times" style="color:#DC2626;"></i> <strong>No availability</strong> — this doctor has no slots on ' + (data.message ? data.message.replace('Doctor is not available on this day','this day') : 'this date') + '.';
+        return;
+      }
+      msg.style.display = 'none';
+      grid.style.display = 'flex';
+      data.slots.forEach(slot => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = slot.time;
+        btn.style.cssText = `padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:${slot.available?'pointer':'not-allowed'};transition:.15s;border:2px solid ${slot.available?'var(--hs-blue)':'#e5e7eb'};background:${slot.available?'#fff':'#f9fafb'};color:${slot.available?'var(--hs-blue)':'#9CA3AF'};`;
+        if (!slot.available) {
+          btn.title = 'Already booked';
+          btn.disabled = true;
+          btn.style.textDecoration = 'line-through';
+        } else {
+          btn.onclick = () => selectSlot(slot.time, btn);
+        }
+        grid.appendChild(btn);
+      });
+      const avail = data.available;
+      msg.style.display = 'block';
+      msg.innerHTML = `<i class="fas fa-check-circle" style="color:#16A34A;"></i> <strong>${avail} slot${avail!==1?'s':''} available</strong> on ${data.day} — click to select`;
+    })
+    .catch(() => {
+      msg.innerHTML = '<i class="fas fa-wifi" style="color:#DC2626;"></i> Could not load slots. Please try again.';
+    });
+}
+
+function selectSlot(time, btn) {
+  document.querySelectorAll('#slotsGrid button').forEach(b => {
+    b.style.background = '#fff';
+    b.style.color = 'var(--hs-blue)';
+  });
+  btn.style.background = 'var(--hs-blue)';
+  btn.style.color = '#fff';
+  document.getElementById('apptTimeHidden').value = time;
+}
 function filterAppts(status) {
   document.querySelectorAll('.appt-row').forEach(row => {
     row.style.display = (status === 'all' || row.dataset.status === status) ? '' : 'none';
