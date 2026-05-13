@@ -325,7 +325,7 @@ INSERT INTO users (nhs_id, first_name, last_name, email, password, role, phone, 
 
 -- Patient: Emma Watson (password: Patient@123)
 INSERT INTO users (nhs_id, first_name, last_name, email, password, role, phone, date_of_birth, gender, blood_type, address, city, postcode, is_active) VALUES
-('RT44656GRG', 'Emma', 'Patel', 'emma.patel@email.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'patient', '07700900123', '1990-03-15', 'female', 'AB+', '14 Oak Street', 'Leicester', 'LE1 4DF', 1),
+('RT44656GRG', 'Emma', 'Patel', 'emma.patel007@gmail.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'patient', '07700900123', '1990-03-15', 'female', 'AB+', '14 Oak Street', 'Leicester', 'LE1 4DF', 1),
 ('PT556677AA', 'James', 'Hall', 'james.hall@email.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'patient', '07700900456', '1975-07-22', 'male', 'O+', '5 Maple Avenue', 'Leicester', 'LE2 1AB', 1),
 ('PT998877BB', 'Aisha', 'Khan', 'aisha.khan@email.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'patient', '07700900789', '1988-11-30', 'female', 'B+', '22 Elm Road', 'Leicester', 'LE3 5GH', 1);
 

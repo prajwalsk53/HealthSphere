@@ -39,7 +39,7 @@ try {
     echo '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
     echo '<tr style="background:#EEF4FF;"><th style="padding:8px 12px;text-align:left;">Email</th><th style="padding:8px 12px;text-align:left;">Password</th><th style="padding:8px 12px;text-align:left;">Role</th></tr>';
     $accounts = [
-        ['emma.patel@email.com','password','Patient'],
+        ['emma.patel007@gmail.com','password','Patient'],
         ['emma.hall@leicesterhospital.nhs.uk','password','Doctor'],
         ['admin@healthsphere.nhs.uk','password','Admin'],
         ['w.jayson@dhsc.gov.uk','password','Government'],

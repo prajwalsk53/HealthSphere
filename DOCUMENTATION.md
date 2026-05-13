@@ -1184,7 +1184,7 @@ All demo passwords: `password`
 | Name | Role | Email | NHS ID |
 |------|------|-------|--------|
 | System Admin | Admin | admin@healthsphere.info | ADMIN001 |
-| Emma Patel | Patient | emma.patel@email.com | RT44656GRG |
+| Emma Patel | Patient | emma.patel007@gmail.com | RT44656GRG |
 | James Hall | Patient | james.hall@email.com | PT556677AA |
 | Aisha Khan | Patient | aisha.khan@email.com | PT998877BB |
 | Dr. Emma Hall | Doctor | emma.hall@leicesterhospital.nhs.uk | DR001EMMA |

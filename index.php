@@ -472,7 +472,7 @@ html, body { height: 100%; font-family: 'Inter', sans-serif; }
         <div class="demo-grid">
           <?php
           $demos = [
-            ['Emma Patel',     'emma.patel@email.com',               'Patient',      'rb-p','🧑','#DBEAFE'],
+            ['Emma Patel',     'emma.patel007@gmail.com',            'Patient',      'rb-p','🧑','#DBEAFE'],
             ['Dr. Jessica Johns',  'jessica.johns@leicesterhospital.nhs.uk', 'Doctor',       'rb-d','👩‍⚕️','#DCFCE7'],
             ['System Admin',   'admin@healthsphere.info',          'Admin',        'rb-a','🛡️','#FEF3C7'],
             ['W. Jayson',      'w.jayson@dhsc.gov.uk',               'Gov. Analyst', 'rb-g','🏛️','#EDE9FE'],
@@ -520,7 +520,7 @@ function fillLogin(email) {
 
 // NHS button quick login — bypasses captcha for demo accounts
 document.getElementById('nhsSignInBtn').addEventListener('click', () => {
-  fillLogin('emma.patel@email.com');
+  fillLogin('emma.patel007@gmail.com');
   // Enable button so demo fill can submit
   const btn = document.getElementById('loginSubmitBtn');
   btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer';
