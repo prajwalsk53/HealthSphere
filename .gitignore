@@ -16,7 +16,7 @@ Thumbs.db
 .claude/
 
 # ── PHP dependency / cache ────────────────────────────────────────────
-# vendor/ intentionally committed so Stripe SDK deploys to IONOS via SFTP
+vendor/
 
 # ── Flutter build artifacts ───────────────────────────────────────────
 flutter_app/build/
