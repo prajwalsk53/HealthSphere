@@ -315,7 +315,7 @@ html, body { height: 100%; font-family: 'Inter', sans-serif; }
 .demo-sec { margin-top:16px; border-top:1px solid #EEF4FF; padding-top:14px; }
 .demo-hd  { text-align:center; font-size:10px; font-weight:700; letter-spacing:1.5px;
             text-transform:uppercase; color:#9BAEC8; margin-bottom:10px; }
-.demo-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+.demo-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:7px; }
 .demo-item {
   display:flex; align-items:center; gap:9px;
   padding:8px 10px; border-radius:10px;
@@ -331,6 +331,7 @@ html, body { height: 100%; font-family: 'Inter', sans-serif; }
 .rbadge { padding:2px 7px;border-radius:20px;font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;flex-shrink:0; }
 .rb-p{background:#DBEAFE;color:#1E40AF;} .rb-d{background:#DCFCE7;color:#166534;}
 .rb-a{background:#FEF3C7;color:#92400E;} .rb-g{background:#EDE9FE;color:#5B21B6;}
+.rb-ph{background:#F0FDF4;color:#166534;}
 
 /* Security */
 .sec-foot { text-align:center;margin-top:14px;font-size:11px;color:#9BAEC8;display:flex;align-items:center;justify-content:center;gap:5px; }
@@ -472,10 +473,11 @@ html, body { height: 100%; font-family: 'Inter', sans-serif; }
         <div class="demo-grid">
           <?php
           $demos = [
-            ['Emma Patel',     'emma.patel007@gmail.com',            'Patient',      'rb-p','🧑','#DBEAFE'],
-            ['Dr. Jessica Johns',  'jessica.johns@leicesterhospital.nhs.uk', 'Doctor',       'rb-d','👩‍⚕️','#DCFCE7'],
-            ['System Admin',   'admin@healthsphere.info',          'Admin',        'rb-a','🛡️','#FEF3C7'],
-            ['W. Jayson',      'w.jayson@dhsc.gov.uk',               'Gov. Analyst', 'rb-g','🏛️','#EDE9FE'],
+            ['Emma Patel',        'emma.patel007@gmail.com',                   'Patient',      'rb-p','🧑','#DBEAFE'],
+            ['Dr. Jessica Johns', 'jessica.johns@leicesterhospital.nhs.uk',    'Doctor',       'rb-d','👩‍⚕️','#DCFCE7'],
+            ['System Admin',      'admin@healthsphere.info',                   'Admin',        'rb-a','🛡️','#FEF3C7'],
+            ['W. Jayson',         'w.jayson@dhsc.gov.uk',                      'Gov. Analyst', 'rb-g','🏛️','#EDE9FE'],
+            ['Medical Team',      'medteam@healthsphere.nhs.uk',               'Pharmacy',     'rb-ph','💊','#F0FDF4'],
           ];
           foreach ($demos as [$name, $email, $role, $cls, $icon, $bg]):
           ?>

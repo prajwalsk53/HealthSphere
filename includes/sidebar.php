@@ -58,6 +58,12 @@ $navByRole = [
         ['icon' => 'fa-bell',            'label' => 'Alerts',            'href' => "$base/government/alerts.php"],
         ['icon' => 'fa-file-alt',        'label' => 'Reports',           'href' => "$base/government/reports.php"],
     ],
+    'pharmacy' => [
+        ['icon' => 'fa-th-large',        'label' => 'Dashboard',         'href' => "$base/medical-team/dashboard.php"],
+        ['icon' => 'fa-pills',           'label' => 'Medicine Queue',    'href' => "$base/medical-team/medicine-queue.php",
+            'badge' => (function() use($pdo){ try{ return (int)$pdo->query("SELECT COUNT(*) FROM prescription_orders WHERE status IN ('approved','preparing')")->fetchColumn(); }catch(\Exception $e){ return 0; } })()],
+        ['icon' => 'fa-user',            'label' => 'My Profile',        'href' => "$base/medical-team/profile.php"],
+    ],
 ];
 
 $nav   = $navByRole[$role] ?? [];

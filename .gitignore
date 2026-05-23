@@ -3,6 +3,7 @@ config/db.php
 config/ai.php
 config/mail.php
 config/fitness.php
+config/stripe.php
 
 # ── XAMPP / local server artifacts ───────────────────────────────────
 *.log
@@ -15,8 +16,7 @@ Thumbs.db
 .claude/
 
 # ── PHP dependency / cache ────────────────────────────────────────────
-vendor/
-composer.lock
+# vendor/ intentionally committed so Stripe SDK deploys to IONOS via SFTP
 
 # ── Flutter build artifacts ───────────────────────────────────────────
 flutter_app/build/

@@ -143,6 +143,7 @@ function redirectByRole(string $role): void {
         'doctor'     => BASE_URL . '/doctor/dashboard.php',
         'admin'      => BASE_URL . '/admin/dashboard.php',
         'government' => BASE_URL . '/government/dashboard.php',
+        'pharmacy'   => BASE_URL . '/medical-team/dashboard.php',
     ];
     header('Location: ' . ($routes[$role] ?? BASE_URL . '/index.php'));
     exit;

@@ -4,7 +4,7 @@
  * Actions: place, cancel (patient) | approve, reject, dispatch, deliver (doctor)
  */
 require_once __DIR__ . '/../config/config.php';
-requireRole(['patient','doctor']);
+requireRole(['patient','doctor','pharmacy']);
 header('Content-Type: application/json');
 
 $uid  = $_SESSION['user_id'];
@@ -34,10 +34,13 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS prescription_orders (
 
 // ── PATIENT: Place order ─────────────────────────────────────────────
 if ($action === 'place' && $role === 'patient') {
-    $rxId    = (int)($body['prescription_id'] ?? 0);
-    $method  = in_array($body['delivery_method'] ?? '', ['collection','delivery']) ? $body['delivery_method'] : 'collection';
-    $address = trim($body['delivery_address'] ?? '');
-    $notes   = trim($body['patient_notes'] ?? '');
+    $rxId            = (int)($body['prescription_id'] ?? 0);
+    $method          = in_array($body['delivery_method'] ?? '', ['collection','delivery']) ? $body['delivery_method'] : 'collection';
+    $address         = trim($body['delivery_address'] ?? '');
+    $notes           = trim($body['patient_notes'] ?? '');
+    $paymentIntentId = trim($body['payment_intent_id'] ?? '');
+
+    if (!$paymentIntentId) { echo json_encode(['success'=>false,'error'=>'Payment required to place order']); exit; }
 
     // Verify prescription belongs to patient
     $rx = $pdo->prepare("SELECT * FROM prescriptions WHERE id=? AND patient_id=? AND is_active=1");
@@ -50,8 +53,26 @@ if ($action === 'place' && $role === 'patient') {
     $existing->execute([$rxId, $uid]);
     if ($existing->fetch()) { echo json_encode(['success'=>false,'error'=>'You already have an active order for this prescription']); exit; }
 
-    $pdo->prepare("INSERT INTO prescription_orders (prescription_id,patient_id,doctor_id,delivery_method,delivery_address,patient_notes) VALUES (?,?,?,?,?,?)")
-        ->execute([$rxId, $uid, $rx['doctor_id'], $method, $address, $notes]);
+    // Verify payment with Stripe
+    require_once __DIR__ . '/../vendor/autoload.php';
+    require_once __DIR__ . '/../config/stripe.php';
+    \Stripe\Stripe::setApiKey(STRIPE_SECRET_KEY);
+    try {
+        $pi = \Stripe\PaymentIntent::retrieve($paymentIntentId);
+        if ($pi->status !== 'succeeded') { echo json_encode(['success'=>false,'error'=>'Payment not completed']); exit; }
+        // Record payment
+        $pdo->exec("CREATE TABLE IF NOT EXISTS payments (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, payment_type VARCHAR(20) NOT NULL, stripe_payment_intent_id VARCHAR(100) UNIQUE NOT NULL, amount INT NOT NULL, currency VARCHAR(3) DEFAULT 'gbp', status VARCHAR(30) DEFAULT 'succeeded', description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+        $pdo->prepare("INSERT IGNORE INTO payments (user_id,payment_type,stripe_payment_intent_id,amount,currency,status,description) VALUES (?,?,?,?,?,?,?)")
+            ->execute([$uid,'prescription',$paymentIntentId,$pi->amount,$pi->currency,$pi->status,$pi->description]);
+    } catch (\Exception $e) {
+        echo json_encode(['success'=>false,'error'=>'Payment verification failed: '.$e->getMessage()]); exit;
+    }
+
+    // Add column if needed
+    try { $pdo->exec('ALTER TABLE prescription_orders ADD COLUMN payment_intent_id VARCHAR(100) NULL'); } catch(\PDOException $e) {}
+
+    $pdo->prepare("INSERT INTO prescription_orders (prescription_id,patient_id,doctor_id,delivery_method,delivery_address,patient_notes,payment_intent_id) VALUES (?,?,?,?,?,?,?)")
+        ->execute([$rxId, $uid, $rx['doctor_id'], $method, $address, $notes, $paymentIntentId]);
 
     // Notify doctor
     $pdo->prepare("INSERT INTO notifications (user_id,title,message,notification_type) VALUES (?,?,?,'system')")
@@ -72,15 +93,25 @@ if ($action === 'cancel' && $role === 'patient') {
     exit;
 }
 
-// ── DOCTOR: Update order status ──────────────────────────────────────
-if (in_array($action, ['approve','reject','preparing','dispatch','deliver']) && $role === 'doctor') {
+// ── DOCTOR / PHARMACY: Update order status ───────────────────────────
+if (in_array($action, ['approve','reject','preparing','dispatch','deliver']) && in_array($role, ['doctor','pharmacy'])) {
     $orderId    = (int)($body['order_id'] ?? 0);
     $doctorNote = trim($body['doctor_notes'] ?? '');
     $pharmacy   = trim($body['pharmacy_name'] ?? '');
     $estReady   = $body['estimated_ready'] ?? null;
 
-    $row = $pdo->prepare("SELECT po.*, p.medication_name, u.first_name, u.last_name FROM prescription_orders po JOIN prescriptions p ON po.prescription_id=p.id JOIN users u ON po.patient_id=u.id WHERE po.id=? AND po.doctor_id=?");
-    $row->execute([$orderId, $uid]);
+    // Pharmacy can only do preparing/dispatch/deliver on approved orders
+    if ($role === 'pharmacy' && in_array($action, ['approve','reject'])) {
+        echo json_encode(['success'=>false,'error'=>'Medical team cannot approve or reject orders']); exit;
+    }
+
+    if ($role === 'doctor') {
+        $row = $pdo->prepare("SELECT po.*, p.medication_name, u.first_name, u.last_name FROM prescription_orders po JOIN prescriptions p ON po.prescription_id=p.id JOIN users u ON po.patient_id=u.id WHERE po.id=? AND po.doctor_id=?");
+        $row->execute([$orderId, $uid]);
+    } else {
+        $row = $pdo->prepare("SELECT po.*, p.medication_name, u.first_name, u.last_name FROM prescription_orders po JOIN prescriptions p ON po.prescription_id=p.id JOIN users u ON po.patient_id=u.id WHERE po.id=?");
+        $row->execute([$orderId]);
+    }
     $order = $row->fetch();
     if (!$order) { echo json_encode(['success'=>false,'error'=>'Order not found']); exit; }
 

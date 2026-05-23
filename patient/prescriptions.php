@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../config/stripe.php';
 requireRole('patient');
 $user = getCurrentUser();
 $uid  = $user['id'];
@@ -314,29 +315,59 @@ $activeTab = $_GET['tab'] ?? 'prescriptions';
         Your doctor will review this request within <strong>24 hours</strong>. You'll get a notification when it's approved.
       </div>
 
-      <div style="display:flex;gap:10px;">
-        <button onclick="submitOrder()" id="submitOrderBtn"
+      <!-- Step 1 actions -->
+      <div id="orderStep1Btns" style="display:flex;gap:10px;">
+        <button onclick="proceedToRxPayment()" id="submitOrderBtn"
           style="flex:1;background:linear-gradient(135deg,#1565C0,#7C3AED);color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;">
-          <i class="fas fa-check"></i> Confirm Order
+          <i class="fas fa-credit-card"></i> Proceed to Payment
         </button>
         <button onclick="closeOrderModal()" style="padding:12px 20px;border:1.5px solid var(--hs-border);border-radius:10px;background:#fff;cursor:pointer;font-weight:600;color:var(--hs-muted);">Cancel</button>
+      </div>
+
+      <!-- Step 2: Payment -->
+      <div id="rxPaymentStep" style="display:none;">
+        <div style="background:linear-gradient(135deg,#EFF6FF,#F0FDF4);border:1px solid #BFDBFE;border-radius:10px;padding:14px 16px;margin-bottom:16px;">
+          <div style="font-size:11px;font-weight:700;color:var(--hs-muted);text-transform:uppercase;letter-spacing:.6px;">NHS Prescription Fee</div>
+          <div style="font-size:26px;font-weight:800;color:var(--hs-navy);margin-top:2px;">£9.90</div>
+          <div style="font-size:11px;color:var(--hs-muted);margin-top:2px;">Standard NHS prescription charge</div>
+        </div>
+        <div style="margin-bottom:14px;">
+          <label style="font-size:12px;font-weight:700;color:var(--hs-navy);display:block;margin-bottom:8px;"><i class="fas fa-credit-card" style="color:var(--hs-blue);"></i> Card Details</label>
+          <div id="rx-card-element" style="border:1.5px solid var(--hs-border);border-radius:9px;padding:13px 14px;background:#fff;"></div>
+          <div id="rxCardErrors" style="color:#DC2626;font-size:12px;margin-top:6px;min-height:18px;"></div>
+        </div>
+        <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:9px 12px;font-size:11px;color:#166534;margin-bottom:16px;">
+          <i class="fas fa-shield-alt"></i> Secured by Stripe. Your card details never touch our servers.
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button onclick="confirmRxPayment()" id="rxPayBtn"
+            style="flex:1;background:linear-gradient(135deg,#1565C0,#7C3AED);color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;">
+            <i class="fas fa-lock"></i> Pay £9.90 &amp; Order
+          </button>
+          <button onclick="backToOrderStep1()" style="padding:12px 18px;border:1.5px solid var(--hs-border);border-radius:10px;background:#fff;cursor:pointer;font-weight:600;color:var(--hs-muted);">Back</button>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
+<script src="https://js.stripe.com/v3/"></script>
 <script src="../assets/js/main.js"></script>
 <script>
+const stripe = Stripe('<?= STRIPE_PUBLISHABLE_KEY ?>');
 let selectedMethod = 'collection';
+let rxStripeCard = null, rxClientSecret = null;
 
 function openOrderModal(rxId, name, dosage) {
   document.getElementById('orderRxId').value = rxId;
   document.getElementById('orderModalSub').textContent = name + ' — ' + dosage;
   document.getElementById('orderModal').style.display = 'flex';
   selectMethod('collection');
+  backToOrderStep1();
 }
 function closeOrderModal() {
   document.getElementById('orderModal').style.display = 'none';
+  backToOrderStep1();
 }
 function selectMethod(m) {
   selectedMethod = m;
@@ -344,9 +375,54 @@ function selectMethod(m) {
   document.getElementById('opt-delivery').style.borderColor   = m==='delivery'   ? '#7C3AED' : 'var(--hs-border)';
   document.getElementById('addressField').style.display = m==='delivery' ? 'block' : 'none';
 }
-function submitOrder() {
-  const btn = document.getElementById('submitOrderBtn');
-  btn.textContent = 'Placing order...'; btn.disabled = true;
+
+async function proceedToRxPayment() {
+  document.getElementById('orderStep1Btns').style.display = 'none';
+  document.getElementById('rxPaymentStep').style.display = 'block';
+  document.getElementById('rxCardErrors').textContent = '';
+
+  const rxPayBtn = document.getElementById('rxPayBtn');
+  rxPayBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+  rxPayBtn.disabled = true;
+
+  try {
+    const resp = await fetch('../api/create-payment-intent.php?type=prescription');
+    const data = await resp.json();
+    if (data.error) { showToast(data.error, 'error'); backToOrderStep1(); return; }
+
+    rxClientSecret = data.client_secret;
+    const elements = stripe.elements();
+    rxStripeCard = elements.create('card', {
+      style: { base: { fontFamily: "'Inter', sans-serif", fontSize: '14px', color: '#1e3a5f', '::placeholder': { color: '#94a3b8' } } }
+    });
+    rxStripeCard.mount('#rx-card-element');
+    rxPayBtn.innerHTML = '<i class="fas fa-lock"></i> Pay £9.90 & Order';
+    rxPayBtn.disabled = false;
+  } catch (err) {
+    showToast('Failed to load payment. Please try again.', 'error');
+    backToOrderStep1();
+  }
+}
+
+async function confirmRxPayment() {
+  const rxPayBtn = document.getElementById('rxPayBtn');
+  rxPayBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+  rxPayBtn.disabled = true;
+  document.getElementById('rxCardErrors').textContent = '';
+
+  const { paymentIntent, error } = await stripe.confirmCardPayment(rxClientSecret, {
+    payment_method: { card: rxStripeCard }
+  });
+
+  if (error) {
+    document.getElementById('rxCardErrors').textContent = error.message;
+    rxPayBtn.innerHTML = '<i class="fas fa-lock"></i> Pay £9.90 & Order';
+    rxPayBtn.disabled = false;
+    return;
+  }
+
+  rxPayBtn.innerHTML = '<i class="fas fa-check"></i> Payment confirmed! Placing order...';
+
   fetch('../api/prescription-order.php', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -356,12 +432,22 @@ function submitOrder() {
       delivery_method: selectedMethod,
       delivery_address: document.getElementById('deliveryAddress').value,
       patient_notes: document.getElementById('patientNotes').value,
+      payment_intent_id: paymentIntent.id,
     })
   }).then(r=>r.json()).then(d => {
-    if (d.success) { showToast(d.message, 'success'); setTimeout(()=>location.reload(), 1500); }
-    else { showToast(d.error, 'error'); btn.textContent='Confirm Order'; btn.disabled=false; }
-  }).catch(()=>{ showToast('Network error','error'); btn.textContent='Confirm Order'; btn.disabled=false; });
+    if (d.success) { showToast('Order placed and payment confirmed!', 'success'); setTimeout(()=>location.reload(), 1500); }
+    else { showToast(d.error, 'error'); rxPayBtn.innerHTML='<i class="fas fa-lock"></i> Pay £9.90 & Order'; rxPayBtn.disabled=false; }
+  }).catch(()=>{ showToast('Network error','error'); rxPayBtn.innerHTML='<i class="fas fa-lock"></i> Pay £9.90 & Order'; rxPayBtn.disabled=false; });
 }
+
+function backToOrderStep1() {
+  document.getElementById('rxPaymentStep').style.display = 'none';
+  document.getElementById('orderStep1Btns').style.display = 'flex';
+  rxStripeCard = null; rxClientSecret = null;
+  const ce = document.getElementById('rx-card-element');
+  if (ce) ce.innerHTML = '';
+}
+
 function cancelOrder(orderId) {
   if (!confirm('Cancel this prescription order?')) return;
   fetch('../api/prescription-order.php', {

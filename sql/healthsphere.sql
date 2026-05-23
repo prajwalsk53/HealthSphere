@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
     last_name VARCHAR(50) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    role ENUM('patient','doctor','admin','government') DEFAULT 'patient',
+    role ENUM('patient','doctor','admin','government','pharmacy') DEFAULT 'patient',
     phone VARCHAR(20),
     date_of_birth DATE,
     gender ENUM('male','female','other'),
@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS appointments (
     status ENUM('pending','confirmed','arrived','waiting','completed','cancelled','late') DEFAULT 'pending',
     notes TEXT,
     prescription_issued TINYINT(1) DEFAULT 0,
+    payment_intent_id VARCHAR(100) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (patient_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -470,3 +471,22 @@ INSERT INTO access_logs (user_id, accessed_patient_id, action_type, ip_address) 
 (5, 3, 'VIEW_APPOINTMENT', '83.146.180.124'),
 (2, NULL, 'LOGIN', '200.50.116.244'),
 (1, NULL, 'ADMIN_ACCESS', '83.146.180.124');
+
+-- Payments table
+CREATE TABLE IF NOT EXISTS payments (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    payment_type VARCHAR(20) NOT NULL,
+    stripe_payment_intent_id VARCHAR(100) UNIQUE NOT NULL,
+    amount INT NOT NULL,
+    currency VARCHAR(3) DEFAULT 'gbp',
+    status VARCHAR(30) DEFAULT 'succeeded',
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user (user_id),
+    INDEX idx_pi (stripe_payment_intent_id)
+);
+
+-- Medical Team (Pharmacy) demo user (password: password)
+INSERT INTO users (nhs_id, first_name, last_name, email, password, role, phone, is_active) VALUES
+('NHS-MED-TEAM01', 'Medical', 'Team', 'medteam@healthsphere.nhs.uk', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'pharmacy', '07700000001', 1);

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../config/stripe.php';
 require_once __DIR__ . '/../includes/mailer.php';
 requireRole('patient');
 $user = getCurrentUser();
@@ -9,27 +10,60 @@ $success = $error = '';
 
 // Book appointment
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['book'])) {
-    $doctorId = (int) ($_POST['doctor_id'] ?? 0);
-    $date     = $_POST['appt_date'] ?? '';
-    $time     = $_POST['appt_time'] ?? '';
-    $reason   = trim($_POST['reason'] ?? '');
+    $doctorId        = (int) ($_POST['doctor_id'] ?? 0);
+    $date            = $_POST['appt_date'] ?? '';
+    $time            = $_POST['appt_time'] ?? '';
+    $reason          = trim($_POST['reason'] ?? '');
+    $paymentIntentId = trim($_POST['payment_intent_id'] ?? '');
 
-    if ($doctorId && $date && $time) {
-        $stmt = $pdo->prepare("INSERT INTO appointments (patient_id,doctor_id,appointment_date,appointment_time,reason,status) VALUES (?,?,?,?,?,'confirmed')");
-        $stmt->execute([$uid, $doctorId, $date, $time, $reason]);
-        // Notify patient
-        $pdo->prepare("INSERT INTO notifications (user_id,title,message,notification_type) VALUES (?,'Appointment Confirmed','Your appointment has been scheduled.','appointment')")->execute([$uid]);
-        // Send confirmation emails
-        $pat = $pdo->prepare("SELECT first_name,last_name,email,nhs_id FROM users WHERE id=?"); $pat->execute([$uid]); $pat=$pat->fetch();
-        $doc = $pdo->prepare("SELECT u.first_name,u.last_name,u.email,d.hospital_name FROM users u LEFT JOIN doctors d ON u.id=d.user_id WHERE u.id=?"); $doc->execute([$doctorId]); $doc=$doc->fetch();
-        if ($pat && $doc) {
-            $fDate = date('l, d F Y', strtotime($date)); $fTime = date('H:i', strtotime($time));
-            @mailAppointmentPatient($pat['email'],$pat['first_name'].' '.$pat['last_name'],$doc['first_name'].' '.$doc['last_name'],$fDate,$fTime,$reason??'',$doc['hospital_name']??'');
-            @mailAppointmentDoctor($doc['email'],$doc['first_name'].' '.$doc['last_name'],$pat['first_name'].' '.$pat['last_name'],$pat['nhs_id']??'',$fDate,$fTime,$reason??'');
-        }
-        $success = 'Appointment booked successfully!';
-    } else {
+    if (!$doctorId || !$date || !$time) {
         $error = 'Please fill in all required fields.';
+    } elseif (!$paymentIntentId) {
+        $error = 'Payment is required to confirm booking.';
+    } else {
+        // Verify payment with Stripe
+        require_once __DIR__ . '/../vendor/autoload.php';
+        require_once __DIR__ . '/../config/stripe.php';
+        \Stripe\Stripe::setApiKey(STRIPE_SECRET_KEY);
+        try {
+            $pi = \Stripe\PaymentIntent::retrieve($paymentIntentId);
+            if ($pi->status !== 'succeeded') {
+                $error = 'Payment was not completed. Please try again.';
+            } else {
+                // Ensure payments table exists and record payment
+                $pdo->exec("CREATE TABLE IF NOT EXISTS payments (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    user_id INT NOT NULL, payment_type VARCHAR(20) NOT NULL,
+                    stripe_payment_intent_id VARCHAR(100) UNIQUE NOT NULL,
+                    amount INT NOT NULL, currency VARCHAR(3) DEFAULT 'gbp',
+                    status VARCHAR(30) DEFAULT 'succeeded', description TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )");
+                $pdo->prepare("INSERT IGNORE INTO payments (user_id,payment_type,stripe_payment_intent_id,amount,currency,status,description) VALUES (?,?,?,?,?,?,?)")
+                    ->execute([$uid,'appointment',$paymentIntentId,$pi->amount,$pi->currency,$pi->status,$pi->description]);
+
+                // Add payment_intent_id column if needed
+                try { $pdo->exec('ALTER TABLE appointments ADD COLUMN payment_intent_id VARCHAR(100) NULL'); } catch(\PDOException $e) {}
+
+                $stmt = $pdo->prepare("INSERT INTO appointments (patient_id,doctor_id,appointment_date,appointment_time,reason,status,payment_intent_id) VALUES (?,?,?,?,?,'confirmed',?)");
+                $stmt->execute([$uid, $doctorId, $date, $time, $reason, $paymentIntentId]);
+
+                // Notify patient
+                $pdo->prepare("INSERT INTO notifications (user_id,title,message,notification_type) VALUES (?,'Appointment Confirmed','Your appointment has been scheduled and payment confirmed.','appointment')")->execute([$uid]);
+
+                // Send confirmation emails
+                $pat = $pdo->prepare("SELECT first_name,last_name,email,nhs_id FROM users WHERE id=?"); $pat->execute([$uid]); $pat=$pat->fetch();
+                $doc = $pdo->prepare("SELECT u.first_name,u.last_name,u.email,d.hospital_name FROM users u LEFT JOIN doctors d ON u.id=d.user_id WHERE u.id=?"); $doc->execute([$doctorId]); $doc=$doc->fetch();
+                if ($pat && $doc) {
+                    $fDate = date('l, d F Y', strtotime($date)); $fTime = date('H:i', strtotime($time));
+                    @mailAppointmentPatient($pat['email'],$pat['first_name'].' '.$pat['last_name'],$doc['first_name'].' '.$doc['last_name'],$fDate,$fTime,$reason??'',$doc['hospital_name']??'');
+                    @mailAppointmentDoctor($doc['email'],$doc['first_name'].' '.$doc['last_name'],$pat['first_name'].' '.$pat['last_name'],$pat['nhs_id']??'',$fDate,$fTime,$reason??'');
+                }
+                $success = 'Appointment booked and payment confirmed!';
+            }
+        } catch (\Exception $e) {
+            $error = 'Payment verification failed: ' . $e->getMessage();
+        }
     }
 }
 
@@ -181,65 +215,105 @@ $msgCount   = getUnreadMessages($pdo, $uid);
 <div id="bookModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;align-items:center;justify-content:center;padding:20px;">
   <div style="background:#fff;border-radius:16px;width:100%;max-width:520px;box-shadow:var(--shadow-lg);overflow:hidden;">
     <div style="background:var(--hs-navy);color:#fff;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;">
-      <h5 style="margin:0;font-size:16px;font-weight:700;"><i class="fas fa-calendar-plus"></i> Book Appointment</h5>
-      <button onclick="document.getElementById('bookModal').style.display='none'" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;">×</button>
+      <h5 style="margin:0;font-size:16px;font-weight:700;" id="modalTitle"><i class="fas fa-calendar-plus"></i> Book Appointment</h5>
+      <button onclick="closeBookModal()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;">×</button>
     </div>
-    <form method="POST" style="padding:24px;">
-      <div id="selectedDoctorInfo" style="display:none;background:var(--hs-off-white);border-radius:8px;padding:12px 16px;margin-bottom:16px;border:1px solid var(--hs-border);">
-        <div id="selDocName" style="font-weight:700;color:var(--hs-navy);"></div>
-        <div id="selDocSpec" style="font-size:12px;color:var(--hs-blue);"></div>
-      </div>
-      <div style="margin-bottom:14px;">
-        <label class="form-label">Select Doctor *</label>
-        <select name="doctor_id" id="doctorSelect" class="form-select" required>
-          <option value="">Choose a doctor...</option>
-          <?php foreach ($doctors as $doc): ?>
-          <option value="<?= $doc['id'] ?>" data-name="Dr. <?= e($doc['first_name'].' '.$doc['last_name']) ?>" data-spec="<?= e($doc['specialization']) ?>">
-            Dr. <?= e($doc['first_name'].' '.$doc['last_name']) ?> — <?= e($doc['specialization']) ?>
-          </option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-      <div style="margin-bottom:14px;">
-        <label class="form-label">Date *</label>
-        <input type="date" name="appt_date" id="apptDate" class="form-control" min="<?= date('Y-m-d') ?>" required onchange="loadSlots()">
-      </div>
 
-      <!-- Slot picker -->
-      <div style="margin-bottom:14px;">
-        <label class="form-label">Available Time Slots *</label>
-        <input type="hidden" name="appt_time" id="apptTimeHidden" required>
-        <div id="slotsContainer" style="min-height:60px;border:1.5px solid var(--hs-border);border-radius:9px;padding:12px;background:#FAFCFF;">
-          <div id="slotsMsg" style="font-size:13px;color:var(--hs-muted);text-align:center;padding:8px 0;">
-            <i class="fas fa-info-circle"></i> Select a doctor and date to see available slots
+    <form method="POST" id="bookingForm">
+      <input type="hidden" name="payment_intent_id" id="paymentIntentHidden">
+
+      <!-- Step 1: Details -->
+      <div id="bookStep1" style="padding:24px;">
+        <div id="selectedDoctorInfo" style="display:none;background:var(--hs-off-white);border-radius:8px;padding:12px 16px;margin-bottom:16px;border:1px solid var(--hs-border);">
+          <div id="selDocName" style="font-weight:700;color:var(--hs-navy);"></div>
+          <div id="selDocSpec" style="font-size:12px;color:var(--hs-blue);"></div>
+        </div>
+        <div style="margin-bottom:14px;">
+          <label class="form-label">Select Doctor *</label>
+          <select name="doctor_id" id="doctorSelect" class="form-select" required>
+            <option value="">Choose a doctor...</option>
+            <?php foreach ($doctors as $doc): ?>
+            <option value="<?= $doc['id'] ?>" data-name="Dr. <?= e($doc['first_name'].' '.$doc['last_name']) ?>" data-spec="<?= e($doc['specialization']) ?>" data-fee="<?= (float)($doc['consultation_fee'] ?? 50) ?>">
+              Dr. <?= e($doc['first_name'].' '.$doc['last_name']) ?> — <?= e($doc['specialization']) ?> (£<?= number_format((float)($doc['consultation_fee']??50),2) ?>)
+            </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div style="margin-bottom:14px;">
+          <label class="form-label">Date *</label>
+          <input type="date" name="appt_date" id="apptDate" class="form-control" min="<?= date('Y-m-d') ?>" required onchange="loadSlots()">
+        </div>
+        <div style="margin-bottom:14px;">
+          <label class="form-label">Available Time Slots *</label>
+          <input type="hidden" name="appt_time" id="apptTimeHidden" required>
+          <div id="slotsContainer" style="min-height:60px;border:1.5px solid var(--hs-border);border-radius:9px;padding:12px;background:#FAFCFF;">
+            <div id="slotsMsg" style="font-size:13px;color:var(--hs-muted);text-align:center;padding:8px 0;">
+              <i class="fas fa-info-circle"></i> Select a doctor and date to see available slots
+            </div>
+            <div id="slotsGrid" style="display:flex;flex-wrap:wrap;gap:8px;display:none;"></div>
           </div>
-          <div id="slotsGrid" style="display:flex;flex-wrap:wrap;gap:8px;display:none;"></div>
+        </div>
+        <div style="margin-bottom:20px;">
+          <label class="form-label">Reason / Symptoms</label>
+          <textarea name="reason" id="apptReason" class="form-control" rows="3" placeholder="Brief description of your concern..."></textarea>
+        </div>
+        <div style="display:flex;gap:12px;">
+          <button type="button" onclick="proceedToPayment()" class="btn-hs btn-primary-hs" style="flex:1;justify-content:center;">
+            <i class="fas fa-credit-card"></i> Proceed to Payment
+          </button>
+          <button type="button" onclick="closeBookModal()" class="btn-hs btn-outline-hs">Cancel</button>
         </div>
       </div>
-      <div style="margin-bottom:20px;">
-        <label class="form-label">Reason / Symptoms</label>
-        <textarea name="reason" class="form-control" rows="3" placeholder="Brief description of your concern..."></textarea>
-      </div>
-      <div style="display:flex;gap:12px;">
-        <button type="submit" name="book" class="btn-hs btn-primary-hs" style="flex:1;justify-content:center;">
-          <i class="fas fa-check"></i> Confirm Booking
-        </button>
-        <button type="button" onclick="document.getElementById('bookModal').style.display='none'" class="btn-hs btn-outline-hs">
-          Cancel
-        </button>
+
+      <!-- Step 2: Payment -->
+      <div id="bookStep2" style="display:none;padding:24px;">
+        <div style="background:linear-gradient(135deg,#EFF6FF,#F0FDF4);border:1px solid #BFDBFE;border-radius:12px;padding:16px 20px;margin-bottom:20px;">
+          <div style="font-size:12px;font-weight:700;color:var(--hs-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;">Consultation Fee</div>
+          <div style="font-size:28px;font-weight:800;color:var(--hs-navy);" id="paymentAmount">£0.00</div>
+          <div id="paymentDesc" style="font-size:12px;color:var(--hs-muted);margin-top:2px;"></div>
+        </div>
+
+        <div style="margin-bottom:16px;">
+          <label style="font-size:12px;font-weight:700;color:var(--hs-navy);display:block;margin-bottom:8px;">
+            <i class="fas fa-credit-card" style="color:var(--hs-blue);"></i> Card Details
+          </label>
+          <div id="stripe-card-element" style="border:1.5px solid var(--hs-border);border-radius:9px;padding:13px 14px;background:#fff;transition:.2s;"></div>
+          <div id="cardErrors" style="color:#DC2626;font-size:12px;margin-top:6px;min-height:18px;"></div>
+        </div>
+
+        <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 14px;font-size:12px;color:#166534;margin-bottom:20px;">
+          <i class="fas fa-shield-alt"></i> Payments secured by Stripe. Your card data never touches our servers.
+        </div>
+
+        <div style="display:flex;gap:12px;">
+          <button type="button" id="payBtn" onclick="confirmPaymentAndBook()" class="btn-hs btn-primary-hs" style="flex:1;justify-content:center;">
+            <i class="fas fa-lock"></i> Pay & Confirm Booking
+          </button>
+          <button type="button" onclick="backToBookingStep1()" class="btn-hs btn-outline-hs">Back</button>
+        </div>
       </div>
     </form>
   </div>
 </div>
 
+<script src="https://js.stripe.com/v3/"></script>
 <script src="../assets/js/main.js"></script>
 <script>
+const stripe = Stripe('<?= STRIPE_PUBLISHABLE_KEY ?>');
+let stripeElements, stripeCard, clientSecret;
+
+function closeBookModal() {
+  document.getElementById('bookModal').style.display = 'none';
+  backToBookingStep1();
+}
+
 function selectDoctor(id, name, spec) {
   document.getElementById('doctorSelect').value = id;
   document.getElementById('selDocName').textContent = name;
   document.getElementById('selDocSpec').textContent = spec;
   document.getElementById('selectedDoctorInfo').style.display = 'block';
   document.getElementById('bookModal').style.display = 'flex';
+  backToBookingStep1();
   loadSlots();
 }
 document.getElementById('doctorSelect').addEventListener('change', function() {
@@ -315,6 +389,85 @@ function filterAppts(status) {
   document.querySelectorAll('.appt-row').forEach(row => {
     row.style.display = (status === 'all' || row.dataset.status === status) ? '' : 'none';
   });
+}
+
+async function proceedToPayment() {
+  const doctorId = document.getElementById('doctorSelect').value;
+  const date     = document.getElementById('apptDate').value;
+  const time     = document.getElementById('apptTimeHidden').value;
+
+  if (!doctorId) { showToast('Please select a doctor', 'error'); return; }
+  if (!date)     { showToast('Please select a date', 'error'); return; }
+  if (!time)     { showToast('Please select a time slot', 'error'); return; }
+
+  const opt = document.getElementById('doctorSelect').options[document.getElementById('doctorSelect').selectedIndex];
+  const fee = parseFloat(opt.dataset.fee || 50).toFixed(2);
+
+  document.getElementById('bookStep1').style.display = 'none';
+  document.getElementById('bookStep2').style.display = 'block';
+  document.getElementById('modalTitle').innerHTML = '<i class="fas fa-lock"></i> Secure Payment';
+  document.getElementById('paymentAmount').textContent = '£' + fee;
+  document.getElementById('paymentDesc').textContent = 'Consultation with ' + (opt.dataset.name || 'Doctor');
+  document.getElementById('cardErrors').textContent = '';
+
+  const payBtn = document.getElementById('payBtn');
+  payBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+  payBtn.disabled = true;
+
+  try {
+    const resp = await fetch(`../api/create-payment-intent.php?type=appointment&doctor_id=${doctorId}`);
+    const data = await resp.json();
+    if (data.error) { showToast(data.error, 'error'); backToBookingStep1(); return; }
+
+    clientSecret = data.client_secret;
+
+    if (!stripeElements) {
+      stripeElements = stripe.elements();
+      stripeCard = stripeElements.create('card', {
+        style: { base: { fontFamily: "'Inter', sans-serif", fontSize: '14px', color: '#1e3a5f', '::placeholder': { color: '#94a3b8' } } }
+      });
+      stripeCard.mount('#stripe-card-element');
+    }
+
+    payBtn.innerHTML = '<i class="fas fa-lock"></i> Pay & Confirm Booking';
+    payBtn.disabled = false;
+  } catch (err) {
+    showToast('Failed to load payment form. Please try again.', 'error');
+    backToBookingStep1();
+  }
+}
+
+async function confirmPaymentAndBook() {
+  const payBtn = document.getElementById('payBtn');
+  payBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing payment...';
+  payBtn.disabled = true;
+  document.getElementById('cardErrors').textContent = '';
+
+  const { paymentIntent, error } = await stripe.confirmCardPayment(clientSecret, {
+    payment_method: { card: stripeCard }
+  });
+
+  if (error) {
+    document.getElementById('cardErrors').textContent = error.message;
+    payBtn.innerHTML = '<i class="fas fa-lock"></i> Pay & Confirm Booking';
+    payBtn.disabled = false;
+    return;
+  }
+
+  document.getElementById('paymentIntentHidden').value = paymentIntent.id;
+  payBtn.innerHTML = '<i class="fas fa-check"></i> Payment confirmed! Booking...';
+  document.getElementById('bookingForm').submit();
+}
+
+function backToBookingStep1() {
+  document.getElementById('bookStep2').style.display = 'none';
+  document.getElementById('bookStep1').style.display = 'block';
+  document.getElementById('modalTitle').innerHTML = '<i class="fas fa-calendar-plus"></i> Book Appointment';
+  stripeElements = null;
+  stripeCard = null;
+  clientSecret = null;
+  const ce = document.getElementById('stripe-card-element');
+  if (ce) ce.innerHTML = '';
 }
 </script>
 </body>

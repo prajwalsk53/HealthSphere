@@ -43,6 +43,7 @@ try {
         ['emma.hall@leicesterhospital.nhs.uk','password','Doctor'],
         ['admin@healthsphere.nhs.uk','password','Admin'],
         ['w.jayson@dhsc.gov.uk','password','Government'],
+        ['medteam@healthsphere.nhs.uk','password','Medical Team (Pharmacy)'],
     ];
     foreach ($accounts as [$email,$pass,$role]) {
         echo "<tr style='border-bottom:1px solid #DBEAFE;'><td style='padding:8px 12px;font-family:monospace;'>$email</td><td style='padding:8px 12px;'>$pass</td><td style='padding:8px 12px;font-weight:600;'>$role</td></tr>";
@@ -51,6 +52,15 @@ try {
     echo '<div style="margin-top:24px;text-align:center;">';
     echo '<a href="/HealthSphere/index.php" style="display:inline-block;background:#1565C0;color:#fff;padding:14px 28px;border-radius:10px;font-weight:700;text-decoration:none;font-size:15px;">🚀 Launch HealthSphere →</a>';
     echo '</div>';
+    // Payment & Pharmacy migrations
+    $migrations = [
+        "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS payment_intent_id VARCHAR(100) NULL",
+        "CREATE TABLE IF NOT EXISTS payments (id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, payment_type VARCHAR(20) NOT NULL, stripe_payment_intent_id VARCHAR(100) UNIQUE NOT NULL, amount INT NOT NULL, currency VARCHAR(3) DEFAULT 'gbp', status VARCHAR(30) DEFAULT 'succeeded', description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    ];
+    foreach ($migrations as $m) {
+        try { $pdo->exec($m); } catch(\PDOException $e) { /* ignore */ }
+    }
+
     echo '<p style="font-size:12px;color:#5E7A99;text-align:center;margin-top:16px;">⚠️ Delete or restrict access to this setup.php file after setup.</p>';
     echo '</div></body></html>';
 
