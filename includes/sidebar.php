@@ -115,6 +115,9 @@ $currentPath = $_SERVER['REQUEST_URI'];
       <div style="font-weight:700;color:#fff;font-family:monospace;"><?= e($user['nhs_id']) ?></div>
     </div>
     <?php endif; ?>
+    <a href="<?= $base ?>/app-guide.php" class="nav-link" style="color:rgba(255,255,255,.5);font-size:12px;">
+      <i class="fas fa-book-open"></i> App Guide
+    </a>
     <a href="<?= $base ?>/logout.php" class="nav-link" style="color:rgba(239,68,68,.8);">
       <i class="fas fa-sign-out-alt"></i> Sign Out
     </a>
