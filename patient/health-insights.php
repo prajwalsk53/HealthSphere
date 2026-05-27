@@ -49,7 +49,7 @@ $msgCount   = getUnreadMessages($pdo, $uid);
   <div class="hs-topbar">
     <div>
       <div class="page-title"><i class="fas fa-heartbeat" style="color:var(--hs-blue);"></i> Health Insights</div>
-      <div class="page-subtitle">Data from HealthSphere Band · <?= date('d M Y') ?></div>
+      <div class="page-subtitle">Data from Google Fit / HealthSphere Band · <?= date('d M Y') ?></div>
     </div>
     <div class="topbar-actions">
       <div style="display:flex;gap:4px;background:rgba(255,255,255,.1);border-radius:8px;padding:4px;">

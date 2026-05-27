@@ -37,6 +37,7 @@ $recentMetrics = $pdo->prepare("
 ");
 $recentMetrics->execute([$uid]);
 $recentMetrics = $recentMetrics->fetchAll();
+$hasImportedData = !empty($recentMetrics);
 
 // Deduplicate by date (keep first/latest per date)
 $seen = []; $uniqueMetrics = [];
@@ -50,6 +51,7 @@ foreach ($recentMetrics as $m) {
 $connected    = isset($_GET['connected']);
 $disconnected = isset($_GET['disconnected']);
 $syncError    = $_GET['error'] ?? '';
+$imported     = isset($_GET['imported']) ? (int)$_GET['imported'] : 0;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -85,6 +87,11 @@ $syncError    = $_GET['error'] ?? '';
         <i class="fab fa-google"></i> Connect Google Fit
       </a>
       <?php endif; ?>
+      <button id="takeoutBtn" onclick="importTakeout()"
+        style="display:flex;align-items:center;gap:8px;background:#0A1F44;color:#fff;border:none;border-radius:9px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;">
+        <i class="fas fa-file-import"></i> Import Takeout
+      </button>
+      <input id="takeoutFile" type="file" accept=".zip,application/zip" style="display:none;">
     </div>
   </div>
 
@@ -104,6 +111,13 @@ $syncError    = $_GET['error'] ?? '';
       </div>
       <?php endif; ?>
 
+      <?php if ($imported): ?>
+      <div style="background:#F0FDF4;border:1px solid #86EFAC;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">
+        <i class="fas fa-check-circle" style="color:#16A34A;"></i>
+        <span><strong style="color:#15803D;">Google Fit Takeout imported.</strong> <span style="font-size:13px;color:#166534;"><?= $imported ?> days are now available in Wearable Sync and Health Insights.</span></span>
+      </div>
+      <?php endif; ?>
+
       <!-- Sync result -->
       <div id="syncResult" style="display:none;margin-bottom:16px;"></div>
 
@@ -115,9 +129,9 @@ $syncError    = $_GET['error'] ?? '';
               <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#4285F4,#34A853,#FBBC05,#EA4335);display:flex;align-items:center;justify-content:center;font-size:18px;">🏃</div>
               <div>
                 <div style="font-weight:700;font-size:14px;color:var(--hs-navy);">Google Fit</div>
-                <div style="font-size:12px;font-weight:600;color:<?= $isConnected ? '#16A34A' : '#9CA3AF' ?>;">
-                  <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:<?= $isConnected ? '#16A34A' : '#9CA3AF' ?>;margin-right:4px;"></span>
-                  <?= $isConnected ? 'Connected' : 'Not connected' ?>
+                <div style="font-size:12px;font-weight:600;color:<?= ($isConnected || $hasImportedData) ? '#16A34A' : '#9CA3AF' ?>;">
+                  <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:<?= ($isConnected || $hasImportedData) ? '#16A34A' : '#9CA3AF' ?>;margin-right:4px;"></span>
+                  <?= $isConnected ? 'Connected' : ($hasImportedData ? 'Takeout imported' : 'Not connected') ?>
                 </div>
               </div>
             </div>
@@ -126,13 +140,13 @@ $syncError    = $_GET['error'] ?? '';
             <?php endif; ?>
             <div style="margin-left:auto;display:flex;gap:16px;font-size:12px;color:var(--hs-muted);">
               <span>👣 Steps</span><span>❤️ Heart Rate</span><span>😴 Sleep</span><span>🔥 Calories</span><span>⚖️ Weight</span>
-              <span style="background:#FEF3C7;color:#92400E;border-radius:4px;padding:2px 8px;font-weight:600;">🔒 Read-only · Last 7 days</span>
+              <span style="background:#FEF3C7;color:#92400E;border-radius:4px;padding:2px 8px;font-weight:600;">Read-only · OAuth or Takeout</span>
             </div>
           </div>
         </div>
       </div>
 
-      <?php if (!$isConnected): ?>
+      <?php if (!$isConnected && !$hasImportedData): ?>
       <!-- Connect prompt -->
       <div class="hs-card">
         <div class="hs-card-body" style="text-align:center;padding:40px;">
@@ -152,6 +166,15 @@ $syncError    = $_GET['error'] ?? '';
             <div>3. Approve permissions</div>
             <div>4. Click Sync Now</div>
           </div>
+          <div style="margin-top:24px;border-top:1px solid var(--hs-border);padding-top:20px;">
+            <button onclick="importTakeout()"
+              style="display:inline-flex;align-items:center;gap:10px;background:#0A1F44;color:#fff;padding:12px 24px;border-radius:12px;border:none;font-weight:700;font-size:14px;cursor:pointer;">
+              <i class="fas fa-file-import"></i> Import Google Fit Takeout ZIP
+            </button>
+            <div style="margin-top:10px;font-size:12px;color:var(--hs-muted);">
+              Choose the Google Takeout ZIP exported from Fit.
+            </div>
+          </div>
         </div>
       </div>
 
@@ -160,7 +183,7 @@ $syncError    = $_GET['error'] ?? '';
       <div class="hs-card">
         <div class="hs-card-header">
           <span class="card-title"><i class="fas fa-history"></i> Synced Health Data</span>
-          <span style="font-size:12px;color:var(--hs-muted);">Source: Google Fit · <?= count($uniqueMetrics) ?> days</span>
+          <span style="font-size:12px;color:var(--hs-muted);">Source: Google Fit / Takeout · <?= count($uniqueMetrics) ?> days</span>
         </div>
         <?php if ($uniqueMetrics): ?>
         <div class="hs-card-body p-0">
@@ -229,6 +252,65 @@ function syncNow() {
       btn.disabled  = false;
     });
 }
+
+function importTakeout() {
+  const fileInput = document.getElementById('takeoutFile');
+  if (fileInput && !fileInput.files.length) {
+    fileInput.click();
+    return;
+  }
+
+  const btn = document.getElementById('takeoutBtn');
+  const result = document.getElementById('syncResult');
+  const form = new FormData();
+  if (fileInput && fileInput.files.length) {
+    form.append('takeout_zip', fileInput.files[0]);
+  }
+  if (btn) {
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importing...';
+    btn.disabled = true;
+  }
+
+  fetch('../api/google-fit-takeout-import.php', { method: 'POST', body: form })
+    .then(r => r.json())
+    .then(data => {
+      if (btn) {
+        btn.innerHTML = '<i class="fas fa-file-import"></i> Import Takeout';
+        btn.disabled = false;
+      }
+      if (fileInput) fileInput.value = '';
+      result.style.display = 'block';
+      if (data.success) {
+        result.innerHTML = `<div style="background:#F0FDF4;border:1px solid #86EFAC;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px;">
+          <i class="fas fa-check-circle" style="color:#16A34A;"></i>
+          <span style="color:#15803D;font-weight:700;">${data.message}. Latest day: ${data.latest_date}</span>
+          <a href="health-insights.php" style="margin-left:auto;font-size:12px;color:#15803D;font-weight:700;">View health score →</a>
+        </div>`;
+        setTimeout(() => location.href = 'wearable.php?imported=' + encodeURIComponent(data.imported), 1500);
+      } else {
+        result.innerHTML = `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px 16px;color:#991B1B;">
+          <i class="fas fa-exclamation-circle"></i> ${data.error}
+        </div>`;
+      }
+    })
+    .catch(() => {
+      if (btn) {
+        btn.innerHTML = '<i class="fas fa-file-import"></i> Import Takeout';
+        btn.disabled = false;
+      }
+      if (fileInput) fileInput.value = '';
+      result.style.display = 'block';
+      result.innerHTML = `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px 16px;color:#991B1B;">
+        <i class="fas fa-exclamation-circle"></i> Import failed. Please try again.
+      </div>`;
+    });
+}
+
+document.getElementById('takeoutFile')?.addEventListener('change', () => {
+  if (document.getElementById('takeoutFile').files.length) {
+    importTakeout();
+  }
+});
 </script>
 </body>
 </html>
