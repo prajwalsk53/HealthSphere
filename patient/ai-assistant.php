@@ -283,11 +283,11 @@ html,body { height:100%; overflow:hidden; }
       <div class="ctx-section">
         <div class="ctx-title">Active Medications</div>
         <?php foreach (array_slice($meds, 0, 4) as $m): ?>
-        <div class="ctx-item" style="cursor:pointer;" onclick="askAbout('Tell me about <?= addslashes($m['medication_name']) ?>')">
+        <div class="ctx-item" style="cursor:pointer;" onclick="lookupDrug('<?= addslashes($m['medication_name']) ?>')" title="Look up <?= e($m['medication_name']) ?> in FDA database">
           <span class="ci-icon">💊</span>
-          <div>
+          <div style="flex:1;">
             <div style="font-weight:600;font-size:12.5px;color:var(--hs-navy);"><?= e($m['medication_name']) ?></div>
-            <div style="font-size:11px;color:var(--hs-muted);"><?= e($m['dosage']) ?></div>
+            <div style="font-size:11px;color:var(--hs-muted);"><?= e($m['dosage']) ?> &middot; <span style="color:var(--hs-blue);">FDA + NHS lookup</span></div>
           </div>
         </div>
         <?php endforeach; ?>
@@ -309,6 +309,26 @@ html,body { height:100%; overflow:hidden; }
         <?php endforeach; ?>
       </div>
       <?php endif; ?>
+
+      <!-- Drug Lookup -->
+      <div class="ctx-section">
+        <div class="ctx-title" style="display:flex;align-items:center;gap:6px;">
+          Drug Lookup
+          <span style="font-size:9px;background:#DCFCE7;color:#16A34A;border-radius:4px;padding:1px 5px;font-weight:700;">FDA</span>
+          <span style="font-size:9px;background:#DBEAFE;color:#1D4ED8;border-radius:4px;padding:1px 5px;font-weight:700;">NHS</span>
+        </div>
+        <div style="display:flex;gap:5px;margin-bottom:8px;">
+          <input type="text" id="fdaInput" placeholder="e.g. Amlodipine, Ibuprofen…"
+            style="flex:1;border:1.5px solid var(--hs-border);border-radius:8px;padding:6px 10px;font-size:12px;font-family:inherit;outline:none;min-width:0;"
+            onfocus="this.style.borderColor='var(--hs-blue)'" onblur="this.style.borderColor='var(--hs-border)'"
+            onkeydown="if(event.key==='Enter')lookupDrug()">
+          <button onclick="lookupDrug()" title="Search FDA"
+            style="background:var(--hs-blue);color:#fff;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:13px;flex-shrink:0;">
+            <i class="fas fa-search"></i>
+          </button>
+        </div>
+        <div id="fdaResult" style="display:none;font-size:12px;line-height:1.5;"></div>
+      </div>
 
       <!-- Quick questions -->
       <div class="ctx-section" style="flex:1;">
@@ -569,6 +589,181 @@ function clearChat() {
 
 // Focus input on load
 input.focus();
+
+// ── OpenFDA Drug Lookup ────────────────────────────────────────────
+async function lookupDrug(prefill) {
+  const fdaInput  = document.getElementById('fdaInput');
+  const fdaResult = document.getElementById('fdaResult');
+  if (prefill) fdaInput.value = prefill;
+  const q = fdaInput.value.trim();
+  if (!q) return;
+
+  fdaResult.style.display = 'block';
+  fdaResult.innerHTML = '<div style="text-align:center;padding:10px;color:var(--hs-muted);"><i class="fas fa-spinner fa-spin"></i> Searching FDA &amp; NHS databases…</div>';
+
+  try {
+    const [labelRes, recallRes, nhsRes] = await Promise.all([
+      fetch(`<?= BASE_PATH ?>/api/openfda-drug.php?q=${encodeURIComponent(q)}&type=label`).then(r => r.json()),
+      fetch(`<?= BASE_PATH ?>/api/openfda-drug.php?q=${encodeURIComponent(q)}&type=recall`).then(r => r.json()),
+      fetch(`<?= BASE_PATH ?>/api/nhs-medicines.php?drug=${encodeURIComponent(q)}`).then(r => r.json()).catch(() => null),
+    ]);
+
+    const hasNHS = nhsRes && !nhsRes.error && nhsRes.name;
+    const hasFDA = !labelRes.error;
+
+    if (!hasFDA && !hasNHS) {
+      const genericHint = {
+        'calpol':'paracetamol', 'nurofen':'ibuprofen', 'panadol':'paracetamol',
+        'brufen':'ibuprofen', 'ventolin':'salbutamol', 'piriton':'chlorphenamine',
+        'gaviscon':'alginate', 'canesten':'clotrimazole', 'daktarin':'miconazole',
+      }[q.toLowerCase()];
+      const hintHtml = genericHint
+        ? `<br><strong>Try:</strong> <a href="#" onclick="document.getElementById('fdaInput').value='${genericHint}';lookupDrug();return false;" style="color:var(--hs-blue);">${genericHint}</a> (generic name)`
+        : `<br>Try the <strong>generic/active ingredient</strong> name instead of the brand name.`;
+      fdaResult.innerHTML = `<div style="padding:8px;border:1px solid #FECACA;border-radius:8px;background:#FEF2F2;">
+        <div style="color:#DC2626;font-size:12px;font-weight:600;margin-bottom:4px;"><i class="fas fa-exclamation-circle"></i> Not found in FDA or NHS databases</div>
+        <div style="font-size:11.5px;color:#7F1D1D;">${hintHtml}</div>
+        <a href="https://www.nhs.uk/medicines/" target="_blank" style="font-size:11px;color:#1D4ED8;display:inline-block;margin-top:6px;"><i class="fas fa-external-link-alt"></i> Browse NHS Medicines A–Z</a>
+      </div>`;
+      return;
+    }
+
+    const recallCount = recallRes.recalls?.length ?? 0;
+    const recallBadge = recallCount > 0
+      ? `<span style="background:#FEE2E2;color:#DC2626;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;">⚠ ${recallCount} recall${recallCount>1?'s':''}</span>`
+      : `<span style="background:#DCFCE7;color:#16A34A;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;">✓ No recalls</span>`;
+
+    const drugTitle = labelRes.brand_name || labelRes.generic_name || q;
+    const genericLine = (labelRes.brand_name && labelRes.generic_name)
+      ? `<div style="color:var(--hs-muted);font-size:11px;">${escHtml(labelRes.generic_name)}</div>` : '';
+
+    // Build NHS sections content
+    let nhsContent = '';
+    if (hasNHS) {
+      if (nhsRes.description) nhsContent += buildFdaSection(nhsRes.description, 'Overview');
+      (nhsRes.sections || []).slice(0, 4).forEach(s => { nhsContent += buildFdaSection(s.content, s.heading); });
+    }
+
+    const tabs = [
+      { id:'fda-info',    label:'Info',         content: buildFdaSection(labelRes.indications, 'What it treats') + buildFdaSection(labelRes.dosage, 'Dosage'),                                               hidden: !hasFDA },
+      { id:'fda-effects', label:'Side Effects',  content: buildFdaSection(labelRes.adverse_reactions, 'Adverse Reactions') + buildFdaSection(labelRes.warnings, 'Warnings'),                                 hidden: !hasFDA },
+      { id:'fda-inter',   label:'Interactions',  content: buildFdaSection(labelRes.drug_interactions, 'Drug Interactions') + buildFdaSection(labelRes.contraindications, 'Contraindications'),               hidden: !hasFDA },
+      { id:'fda-nhs',     label:'🏥 NHS',        content: nhsContent,                                                                                                                                         hidden: !hasNHS },
+    ].filter(t => !t.hidden);
+
+    let tabBtns = '', tabPanels = '';
+    tabs.forEach((t, i) => {
+      const active = i === 0;
+      tabBtns += `<button onclick="fdaTab('${t.id}')" id="tb-${t.id}"
+        style="flex:1;padding:5px 4px;border:none;background:${active?'var(--hs-blue)':'var(--hs-bg)'};
+        color:${active?'#fff':'var(--hs-muted)'};border-radius:6px;cursor:pointer;font-size:10.5px;font-weight:600;font-family:inherit;transition:.15s;">
+        ${t.label}</button>`;
+      tabPanels += `<div id="${t.id}" style="display:${active?'block':'none'};padding:8px 0;max-height:180px;overflow-y:auto;">${t.content || '<span style="color:var(--hs-muted);">No data available.</span>'}</div>`;
+    });
+
+    fdaResult.innerHTML = `
+      <div style="border:1px solid var(--hs-border);border-radius:10px;overflow:hidden;">
+        <div style="background:var(--hs-bg);padding:9px 10px;border-bottom:1px solid var(--hs-border);">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+            <div>
+              <div style="font-weight:700;color:var(--hs-navy);font-size:12.5px;">${escHtml(drugTitle)}</div>
+              ${genericLine}
+            </div>
+            ${recallBadge}
+          </div>
+          ${labelRes.manufacturer ? `<div style="color:var(--hs-muted);font-size:10px;margin-top:3px;">${escHtml(labelRes.manufacturer)}</div>` : ''}
+        </div>
+        <div style="padding:8px 10px 6px;">
+          <div style="display:flex;gap:4px;margin-bottom:6px;">${tabBtns}</div>
+          ${tabPanels}
+        </div>
+        <div style="border-top:1px solid var(--hs-border);padding:8px 10px;display:flex;gap:6px;">
+          <button onclick="askAbout('Tell me everything about ${q.replace(/'/g,"\\'")} — its uses, side effects, interactions and any safety warnings')"
+            style="flex:1;background:var(--hs-blue);color:#fff;border:none;border-radius:7px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">
+            <i class="fas fa-robot"></i> Ask AI
+          </button>
+          ${recallCount > 0 ? `<button onclick="showRecalls()" style="background:#FEE2E2;color:#DC2626;border:none;border-radius:7px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;"><i class="fas fa-exclamation-triangle"></i> Recalls</button>` : ''}
+        </div>
+        ${hasNHS && nhsRes.attribution ? `
+        <div style="padding:6px 10px;background:#F0F9FF;border-top:1px solid #BAE6FD;display:flex;align-items:center;gap:6px;">
+          <a href="${nhsRes.attribution.url}" target="_blank" rel="noopener">
+            <img src="${nhsRes.attribution.logo}" alt="Content supplied by the NHS website" style="height:20px;width:auto;">
+          </a>
+          <span style="font-size:10px;color:#0369A1;">NHS content</span>
+        </div>` : ''}
+      </div>`;
+
+    // Store recalls for modal
+    window._fdaRecalls = recallRes.recalls ?? [];
+    window._fdaDrugName = drugTitle;
+
+  } catch (e) {
+    fdaResult.innerHTML = `<div style="color:var(--hs-danger);padding:6px;"><i class="fas fa-exclamation-circle"></i> Failed to reach FDA database. Try again.</div>`;
+  }
+}
+
+function buildFdaSection(text, label) {
+  if (!text) return '';
+  return `<div style="margin-bottom:8px;">
+    <div style="font-weight:700;color:var(--hs-navy);font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">${label}</div>
+    <div style="color:var(--hs-text);font-size:11.5px;line-height:1.55;">${escHtml(text)}</div>
+  </div>`;
+}
+
+function fdaTab(activeId) {
+  ['fda-info','fda-effects','fda-inter','fda-nhs'].forEach(id => {
+    const panel = document.getElementById(id);
+    const btn   = document.getElementById('tb-' + id);
+    if (!panel || !btn) return;
+    const active = id === activeId;
+    panel.style.display = active ? 'block' : 'none';
+    btn.style.background = active ? 'var(--hs-blue)' : 'var(--hs-bg)';
+    btn.style.color      = active ? '#fff' : 'var(--hs-muted)';
+  });
+}
+
+function showRecalls() {
+  const recalls = window._fdaRecalls ?? [];
+  const drug    = window._fdaDrugName ?? 'this drug';
+  if (!recalls.length) return;
+
+  let rows = recalls.map(r => {
+    const date = r.date ? r.date.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3') : 'N/A';
+    const cls  = {'Class I':'#DC2626','Class II':'#D97706','Class III':'#16A34A'}[r.classification] ?? '#6B7280';
+    return `<tr>
+      <td style="padding:6px 8px;font-size:11px;color:#6B7280;">${date}</td>
+      <td style="padding:6px 8px;font-size:11px;"><span style="background:${cls}22;color:${cls};border-radius:4px;padding:1px 5px;font-weight:700;font-size:10px;">${r.classification || 'N/A'}</span></td>
+      <td style="padding:6px 8px;font-size:11px;">${escHtml(r.reason)}</td>
+    </tr>`;
+  }).join('');
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:560px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <div style="padding:16px 20px;border-bottom:1px solid #E5E7EB;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-weight:800;color:#0A1F44;font-size:15px;">FDA Recalls: ${escHtml(drug)}</div>
+          <div style="font-size:12px;color:#6B7280;">${recalls.length} recall record${recalls.length>1?'s':''} found</div>
+        </div>
+        <button onclick="this.closest('[style*=fixed]').remove()"
+          style="background:none;border:none;font-size:20px;cursor:pointer;color:#6B7280;line-height:1;">&times;</button>
+      </div>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="background:#F9FAFB;">
+          <th style="padding:8px;font-size:11px;text-align:left;color:#6B7280;">Date</th>
+          <th style="padding:8px;font-size:11px;text-align:left;color:#6B7280;">Class</th>
+          <th style="padding:8px;font-size:11px;text-align:left;color:#6B7280;">Reason</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div style="padding:12px 20px;background:#FEF3C7;border-top:1px solid #FDE68A;font-size:11.5px;color:#92400E;">
+        <strong>Note:</strong> This data is from the FDA OpenFDA database (US recalls). Consult your pharmacist or doctor for guidance.
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+}
 </script>
 </body>
 </html>

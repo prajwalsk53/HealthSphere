@@ -76,6 +76,118 @@ RESPONSE STYLE:
 - Add a brief ⚠️ disclaimer when giving health advice: "This is general information — always consult your doctor for personal medical advice."
 PROMPT;
 
+// ── OpenFDA drug context (auto-injected when message mentions a drug) ─
+function fdaExtractDrugName(string $msg, array $prescriptions): ?string {
+    $lower = strtolower($msg);
+    foreach ($prescriptions as $med) {
+        if (str_contains($lower, strtolower($med['medication_name']))) {
+            return $med['medication_name'];
+        }
+    }
+    $patterns = [
+        '/(?:about|tell me about|what is|explain|side effects? of|effects? of|recalls? (?:for|of)|interactions? (?:with|for|of)|information (?:on|about))\s+([a-z][a-z0-9\-]{2,})/i',
+        '/([a-z][a-z0-9\-]{3,})\s+(?:medication|drug|pill|tablet|medicine|dosage|overdose|side effects?)/i',
+    ];
+    $stop = ['what','that','this','have','with','from','your','about','blood','heart','health','medical','doctor','does','give','cause'];
+    foreach ($patterns as $pat) {
+        if (preg_match($pat, $msg, $m)) {
+            $c = strtolower($m[1]);
+            if (!in_array($c, $stop) && strlen($c) >= 4) return $m[1];
+        }
+    }
+    return null;
+}
+
+function fdaFetchContext(string $drugName): string {
+    $enc  = rawurlencode('"' . $drugName . '"');
+    $enc2 = rawurlencode($drugName);
+    $ctx  = stream_context_create(['http' => ['timeout' => 5, 'ignore_errors' => true]]);
+
+    $raw = @file_get_contents("https://api.fda.gov/drug/label.json?search=(openfda.brand_name:{$enc}+openfda.generic_name:{$enc})&limit=1", false, $ctx);
+    if (!$raw) return '';
+    $data = json_decode($raw, true);
+    if (empty($data['results'])) {
+        $raw = @file_get_contents("https://api.fda.gov/drug/label.json?search={$enc2}&limit=1", false, $ctx);
+        if (!$raw) return '';
+        $data = json_decode($raw, true);
+    }
+    $r = $data['results'][0] ?? null;
+    if (!$r) return '';
+
+    $openfda = $r['openfda'] ?? [];
+    $lines   = ["=== FDA DRUG DATABASE: {$drugName} ==="];
+    if (!empty($openfda['brand_name']))    $lines[] = 'Brand: '          . $openfda['brand_name'][0];
+    if (!empty($openfda['generic_name']))  $lines[] = 'Generic: '        . $openfda['generic_name'][0];
+
+    $fields = [
+        'indications_and_usage'    => 'Indications',
+        'warnings'                 => 'Warnings',
+        'adverse_reactions'        => 'Adverse Reactions',
+        'drug_interactions'        => 'Drug Interactions',
+        'contraindications'        => 'Contraindications',
+        'dosage_and_administration'=> 'Dosage',
+    ];
+    foreach ($fields as $key => $label) {
+        if (!empty($r[$key])) {
+            $text = preg_replace('/\s+/', ' ', implode(' ', (array)$r[$key]));
+            $lines[] = "{$label}: " . mb_substr($text, 0, 350) . (mb_strlen($text) > 350 ? '…' : '');
+        }
+    }
+    return count($lines) > 1 ? implode("\n", $lines) : '';
+}
+
+function nhsFetchMedicineContext(string $slug): string {
+    $apiKey  = defined('NHS_API_KEY') ? NHS_API_KEY : '';
+    $baseUrl = $apiKey
+        ? 'https://api.service.nhs.uk/nhs-website-content'
+        : 'https://sandbox.api.service.nhs.uk/nhs-website-content';
+    $headers = ["Accept: application/json", "User-Agent: HealthSphere/1.0"];
+    if ($apiKey) $headers[] = "apikey: {$apiKey}";
+    $ctx = stream_context_create(['http' => ['timeout' => 5, 'ignore_errors' => true,
+        'header' => implode("\r\n", $headers) . "\r\n"]]);
+
+    $raw = @file_get_contents("{$baseUrl}/medicines/{$slug}/", false, $ctx);
+    if (!$raw) {
+        // Fallback: scrape nhs.uk
+        $raw = @file_get_contents("https://www.nhs.uk/medicines/{$slug}/", false,
+            stream_context_create(['http' => ['timeout' => 5, 'user_agent' => 'HealthSphere/1.0', 'ignore_errors' => true]]));
+        if (!$raw) return '';
+        preg_match_all('/<h2[^>]*>(.*?)<\/h2>(.*?)(?=<h2|<\/article|$)/si', $raw, $secs, PREG_SET_ORDER);
+        $lines = ["=== NHS MEDICINES (UK): ==="];
+        foreach (array_slice($secs, 0, 5) as $s) {
+            $h = strip_tags($s[1]);
+            preg_match_all('/<p[^>]*>(.*?)<\/p>/si', $s[2], $pm);
+            $t = preg_replace('/\s+/', ' ', strip_tags(implode(' ', array_slice($pm[1], 0, 2))));
+            if ($h && strlen($t) > 20) $lines[] = "{$h}: " . mb_substr($t, 0, 300);
+        }
+        return count($lines) > 1 ? implode("\n", $lines) : '';
+    }
+
+    $data = json_decode($raw, true);
+    if (empty($data['name'])) return '';
+    $lines = ["=== NHS MEDICINES (UK): " . $data['name'] . " ==="];
+    foreach (array_slice($data['hasPart'] ?? [], 0, 5) as $part) {
+        $h = $part['headline'] ?? '';
+        $t = preg_replace('/\s+/', ' ', strip_tags(is_array($part['text'] ?? '') ? implode(' ', $part['text']) : ($part['text'] ?? '')));
+        if ($h && strlen($t) > 20) $lines[] = "{$h}: " . mb_substr($t, 0, 300);
+    }
+    return count($lines) > 1 ? implode("\n", $lines) : '';
+}
+
+$fdaContext = '';
+$fdaDrug    = fdaExtractDrugName($message, $meds);
+if ($fdaDrug) {
+    $fdaContext = fdaFetchContext($fdaDrug);
+    // If FDA has no data, try NHS Medicines (better for UK brand names)
+    if (!$fdaContext) {
+        $slug       = strtolower(trim(preg_replace('/[^a-z0-9]+/', '-', $fdaDrug), '-'));
+        $fdaContext = nhsFetchMedicineContext($slug);
+    }
+}
+if ($fdaContext) {
+    $systemPrompt .= "\n\n" . $fdaContext . "\n\nUse the FDA data above to give accurate, evidence-based information about this drug. Always add a disclaimer to consult their doctor.";
+}
+
 // ── Build messages array ───────────────────────────────────────────
 $messages = [];
 foreach ($history as $h) {
