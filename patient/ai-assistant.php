@@ -43,7 +43,7 @@ html,body { height:100%; overflow:hidden; }
 
 /* ── Left context panel ──────────────────────────────────────── */
 .ai-context {
-  width:280px; flex-shrink:0;
+  flex:1; min-width:0;
   background:#fff; border-right:1px solid var(--hs-border);
   display:flex; flex-direction:column; overflow-y:auto;
 }
@@ -71,7 +71,7 @@ html,body { height:100%; overflow:hidden; }
 .qq-btn .qq-icon { font-size:14px; flex-shrink:0; margin-top:1px; }
 
 /* ── Main chat area ──────────────────────────────────────────── */
-.ai-chat { flex:1; display:flex; flex-direction:column; background:#F4F8FF; overflow:hidden; }
+.ai-chat { flex:1; min-width:0; display:flex; flex-direction:column; background:#F4F8FF; overflow:hidden; }
 
 /* Chat messages */
 .chat-messages {
@@ -658,7 +658,7 @@ async function lookupDrug(prefill) {
         style="flex:1;padding:5px 4px;border:none;background:${active?'var(--hs-blue)':'var(--hs-bg)'};
         color:${active?'#fff':'var(--hs-muted)'};border-radius:6px;cursor:pointer;font-size:10.5px;font-weight:600;font-family:inherit;transition:.15s;">
         ${t.label}</button>`;
-      tabPanels += `<div id="${t.id}" style="display:${active?'block':'none'};padding:8px 0;max-height:180px;overflow-y:auto;">${t.content || '<span style="color:var(--hs-muted);">No data available.</span>'}</div>`;
+      tabPanels += `<div id="${t.id}" style="display:${active?'block':'none'};padding:8px 0;max-height:320px;overflow-y:auto;">${t.content || '<span style="color:var(--hs-muted);">No data available.</span>'}</div>`;
     });
 
     fdaResult.innerHTML = `
