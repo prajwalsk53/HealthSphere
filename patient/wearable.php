@@ -72,12 +72,12 @@ $imported     = isset($_GET['imported']) ? (int)$_GET['imported'] : 0;
       <div class="page-subtitle">Google Fit — real-time health data import</div>
     </div>
     <div class="topbar-actions">
-      <?php if ($isConnected): ?>
       <button id="syncBtn" onclick="syncNow()"
         style="display:flex;align-items:center;gap:8px;background:#16A34A;color:#fff;border:none;border-radius:9px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;">
         <i class="fas fa-sync-alt"></i> Sync Now
       </button>
-      <a href="?disconnect=1" onclick="return confirm('Disconnect Google Fit?')"
+      <?php if ($isConnected): ?>
+      <a href="?disconnect=1" onclick="return confirm('Disconnect Google Fit OAuth?')"
         style="font-size:12px;color:#DC2626;font-weight:600;text-decoration:none;display:flex;align-items:center;gap:5px;">
         <i class="fas fa-unlink"></i> Disconnect
       </a>
@@ -87,11 +87,6 @@ $imported     = isset($_GET['imported']) ? (int)$_GET['imported'] : 0;
         <i class="fab fa-google"></i> Connect Google Fit
       </a>
       <?php endif; ?>
-      <button id="takeoutBtn" onclick="importTakeout()"
-        style="display:flex;align-items:center;gap:8px;background:#0A1F44;color:#fff;border:none;border-radius:9px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;">
-        <i class="fas fa-file-import"></i> Import Takeout
-      </button>
-      <input id="takeoutFile" type="file" accept=".zip,application/zip" style="display:none;">
     </div>
   </div>
 
@@ -140,40 +135,42 @@ $imported     = isset($_GET['imported']) ? (int)$_GET['imported'] : 0;
             <?php endif; ?>
             <div style="margin-left:auto;display:flex;gap:16px;font-size:12px;color:var(--hs-muted);">
               <span>👣 Steps</span><span>❤️ Heart Rate</span><span>😴 Sleep</span><span>🔥 Calories</span><span>⚖️ Weight</span>
-              <span style="background:#FEF3C7;color:#92400E;border-radius:4px;padding:2px 8px;font-weight:600;">Read-only · OAuth or Takeout</span>
+              <span style="background:#DCFCE7;color:#166534;border-radius:4px;padding:2px 8px;font-weight:600;"><i class="fab fa-google-drive"></i> Drive Sync</span>
             </div>
           </div>
         </div>
       </div>
 
       <?php if (!$isConnected && !$hasImportedData): ?>
-      <!-- Connect prompt -->
+      <!-- No data yet — show setup instructions -->
       <div class="hs-card">
         <div class="hs-card-body" style="text-align:center;padding:40px;">
           <div style="font-size:48px;margin-bottom:16px;">🏃</div>
-          <h3 style="font-size:18px;font-weight:800;color:var(--hs-navy);margin-bottom:8px;">Connect Google Fit</h3>
-          <p style="font-size:13px;color:var(--hs-muted);margin-bottom:24px;line-height:1.7;">
-            Sync your real steps, heart rate, sleep and calories automatically.<br>
-            Your health score will update with live data from your phone.
+          <h3 style="font-size:18px;font-weight:800;color:var(--hs-navy);margin-bottom:8px;">Set Up Google Drive Sync</h3>
+          <p style="font-size:13px;color:var(--hs-muted);margin-bottom:28px;line-height:1.7;">
+            Export your Google Fit data via Google Takeout, save the ZIP to a Google Drive folder,<br>
+            then click <strong>Sync Now</strong> — HealthSphere will automatically pull the latest data.
           </p>
-          <a href="../api/google-fit-connect.php"
-            style="display:inline-flex;align-items:center;gap:10px;background:#4285F4;color:#fff;padding:13px 28px;border-radius:12px;text-decoration:none;font-weight:700;font-size:14px;">
-            <i class="fab fa-google"></i> Connect Google Fit
-          </a>
-          <div style="margin-top:20px;display:flex;justify-content:center;gap:32px;font-size:12px;color:var(--hs-muted);">
-            <div>1. Install Google Fit on Android</div>
-            <div>2. Click Connect above</div>
-            <div>3. Approve permissions</div>
-            <div>4. Click Sync Now</div>
-          </div>
-          <div style="margin-top:24px;border-top:1px solid var(--hs-border);padding-top:20px;">
-            <button onclick="importTakeout()"
-              style="display:inline-flex;align-items:center;gap:10px;background:#0A1F44;color:#fff;padding:12px 24px;border-radius:12px;border:none;font-weight:700;font-size:14px;cursor:pointer;">
-              <i class="fas fa-file-import"></i> Import Google Fit Takeout ZIP
-            </button>
-            <div style="margin-top:10px;font-size:12px;color:var(--hs-muted);">
-              Choose the Google Takeout ZIP exported from Fit.
+          <div style="display:flex;justify-content:center;gap:20px;flex-wrap:wrap;margin-bottom:28px;">
+            <?php foreach ([
+              ['1','Export from Google','Go to takeout.google.com → select Google Fit → Export'],
+              ['2','Save to Google Drive','Move the Takeout ZIP to your designated Drive folder'],
+              ['3','Click Sync Now','HealthSphere pulls the latest ZIP and imports your data'],
+            ] as [$n,$title,$desc]): ?>
+            <div style="background:#F8FAFF;border:1px solid var(--hs-border);border-radius:12px;padding:18px 20px;width:200px;text-align:left;">
+              <div style="width:28px;height:28px;border-radius:50%;background:var(--hs-blue);color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-bottom:10px;"><?= $n ?></div>
+              <div style="font-weight:700;font-size:13px;color:var(--hs-navy);margin-bottom:4px;"><?= $title ?></div>
+              <div style="font-size:12px;color:var(--hs-muted);line-height:1.5;"><?= $desc ?></div>
             </div>
+            <?php endforeach; ?>
+          </div>
+          <button onclick="syncNow()"
+            style="display:inline-flex;align-items:center;gap:10px;background:#16A34A;color:#fff;padding:13px 32px;border-radius:12px;border:none;font-weight:700;font-size:15px;cursor:pointer;">
+            <i class="fas fa-sync-alt"></i> Sync Now from Google Drive
+          </button>
+          <div style="margin-top:24px;border-top:1px solid var(--hs-border);padding-top:18px;font-size:12px;color:var(--hs-muted);">
+            Or connect via Google Fit OAuth for live sync:
+            <a href="../api/google-fit-connect.php" style="color:var(--hs-blue);font-weight:600;margin-left:6px;"><i class="fab fa-google"></i> Connect Google Fit</a>
           </div>
         </div>
       </div>
@@ -223,94 +220,45 @@ $imported     = isset($_GET['imported']) ? (int)$_GET['imported'] : 0;
 function syncNow() {
   const btn    = document.getElementById('syncBtn');
   const result = document.getElementById('syncResult');
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing from Drive...';
   btn.disabled  = true;
+  result.style.display = 'none';
 
-  fetch('../api/google-fit-sync.php')
+  fetch('../api/google-fit-drive-sync-now.php', { method: 'POST' })
     .then(r => r.json())
     .then(data => {
       btn.innerHTML = '<i class="fas fa-sync-alt"></i> Sync Now';
       btn.disabled  = false;
-      if (data.success) {
-        result.style.display = 'block';
-        result.innerHTML = `<div style="background:#F0FDF4;border:1px solid #86EFAC;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-          <i class="fas fa-check-circle" style="color:#16A34A;"></i>
-          <span style="color:#15803D;font-weight:700;">${data.message}</span>
-          <a href="health-insights.php" style="margin-left:auto;font-size:12px;color:#15803D;font-weight:700;">View health score →</a>
-        </div>`;
-        setTimeout(() => location.reload(), 2000);
-      } else {
-        result.style.display = 'block';
-        result.innerHTML = `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px 16px;color:#991B1B;">
-          <i class="fas fa-exclamation-circle"></i> ${data.error}
-          ${data.error.includes('reconnect') ? ' <a href="../api/google-fit-connect.php" style="color:#DC2626;font-weight:700;">Reconnect →</a>' : ''}
-        </div>`;
-      }
-    })
-    .catch(() => {
-      btn.innerHTML = '<i class="fas fa-sync-alt"></i> Sync Now';
-      btn.disabled  = false;
-    });
-}
-
-function importTakeout() {
-  const fileInput = document.getElementById('takeoutFile');
-  if (fileInput && !fileInput.files.length) {
-    fileInput.click();
-    return;
-  }
-
-  const btn = document.getElementById('takeoutBtn');
-  const result = document.getElementById('syncResult');
-  const form = new FormData();
-  if (fileInput && fileInput.files.length) {
-    form.append('takeout_zip', fileInput.files[0]);
-  }
-  if (btn) {
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importing...';
-    btn.disabled = true;
-  }
-
-  fetch('../api/google-fit-takeout-import.php', { method: 'POST', body: form })
-    .then(r => r.json())
-    .then(data => {
-      if (btn) {
-        btn.innerHTML = '<i class="fas fa-file-import"></i> Import Takeout';
-        btn.disabled = false;
-      }
-      if (fileInput) fileInput.value = '';
       result.style.display = 'block';
+
       if (data.success) {
-        result.innerHTML = `<div style="background:#F0FDF4;border:1px solid #86EFAC;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px;">
-          <i class="fas fa-check-circle" style="color:#16A34A;"></i>
-          <span style="color:#15803D;font-weight:700;">${data.message}. Latest day: ${data.latest_date}</span>
-          <a href="health-insights.php" style="margin-left:auto;font-size:12px;color:#15803D;font-weight:700;">View health score →</a>
-        </div>`;
-        setTimeout(() => location.href = 'wearable.php?imported=' + encodeURIComponent(data.imported), 1500);
+        const msg = data.already_current
+          ? `<i class="fas fa-check-circle" style="color:#16A34A;"></i>
+             <span style="color:#15803D;font-weight:700;">${data.message}</span>
+             <span style="font-size:12px;color:#166534;margin-left:8px;">(${data.imported} days · latest: ${data.latest_date})</span>`
+          : `<i class="fas fa-check-circle" style="color:#16A34A;"></i>
+             <span style="color:#15803D;font-weight:700;">${data.message}</span>
+             <span style="font-size:12px;color:#166534;margin-left:8px;">Latest: ${data.latest_date}</span>
+             <a href="health-insights.php" style="margin-left:auto;font-size:12px;color:#15803D;font-weight:700;">View insights →</a>`;
+        result.innerHTML = `<div style="background:#F0FDF4;border:1px solid #86EFAC;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px;">${msg}</div>`;
+        if (!data.already_current) setTimeout(() => location.href = 'wearable.php?imported=' + encodeURIComponent(data.imported), 1800);
       } else {
+        const isConfig = data.error && data.error.includes('not configured');
         result.innerHTML = `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px 16px;color:#991B1B;">
           <i class="fas fa-exclamation-circle"></i> ${data.error}
+          ${isConfig ? `<div style="margin-top:6px;font-size:12px;">Set <strong>GOOGLE_DRIVE_API_KEY</strong> and <strong>GOOGLE_DRIVE_TAKEOUT_FOLDER_ID</strong> in <code>config/secrets.php</code>.</div>` : ''}
         </div>`;
       }
     })
     .catch(() => {
-      if (btn) {
-        btn.innerHTML = '<i class="fas fa-file-import"></i> Import Takeout';
-        btn.disabled = false;
-      }
-      if (fileInput) fileInput.value = '';
+      btn.innerHTML = '<i class="fas fa-sync-alt"></i> Sync Now';
+      btn.disabled  = false;
       result.style.display = 'block';
       result.innerHTML = `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px 16px;color:#991B1B;">
-        <i class="fas fa-exclamation-circle"></i> Import failed. Please try again.
+        <i class="fas fa-exclamation-circle"></i> Sync failed — please try again.
       </div>`;
     });
 }
-
-document.getElementById('takeoutFile')?.addEventListener('change', () => {
-  if (document.getElementById('takeoutFile').files.length) {
-    importTakeout();
-  }
-});
 </script>
 </body>
 </html>
